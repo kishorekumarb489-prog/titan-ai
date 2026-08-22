@@ -8,8 +8,6 @@ const port = process.env.PORT || 3000;
 
 app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ limit: '20mb', extended: true }));
-
-// Serve static files from root folder
 app.use(express.static(__dirname));
 
 const apiKey = process.env.API_KEY || process.env.OPENROUTER_API_KEY;
@@ -18,17 +16,18 @@ const openai = new OpenAI({
   apiKey: apiKey,
   baseURL: 'https://openrouter.ai/api/v1',
   defaultHeaders: {
-    'HTTP-Referer': 'https://render.com',
+    'HTTP-Referer': 'https://titan-ai.onrender.com',
     'X-Title': 'Titan AI',
   }
 });
 
-// Auto-fallback models
+// Active 100% Free Models on OpenRouter
 const FREE_MODELS = [
   'meta-llama/llama-3.1-8b-instruct:free',
   'google/gemini-2.0-flash-exp:free',
-  'qwen/qwen-2.5-72b-instruct:free',
-  'mistralai/mistral-7b-instruct:free'
+  'deepseek/deepseek-r1:free',
+  'mistralai/mistral-7b-instruct:free',
+  'qwen/qwen-2.5-72b-instruct:free'
 ];
 
 app.post('/api/chat', async (req, res) => {
@@ -38,12 +37,19 @@ app.post('/api/chat', async (req, res) => {
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
 
+  if (!apiKey) {
+    res.write(`data: ${JSON.stringify({ text: '⚠️ API Key is missing in Render Environment Variables! Please add API_KEY.' })}\n\n`);
+    res.write('data: [DONE]\n\n');
+    return res.end();
+  }
+
   const systemPrompt = {
     role: 'system',
-    content: 'You are Titan AI. Always respond clearly in English or the user-requested language. Do not output Arabic.'
+    content: 'You are Titan AI. Respond directly and clearly in English or the requested Indian language (Tamil/Hindi). Do not output Arabic.'
   };
 
   const payload = [systemPrompt, ...messages.filter(m => m.role !== 'system')];
+  let lastError = '';
 
   for (const model of FREE_MODELS) {
     try {
@@ -63,11 +69,12 @@ app.post('/api/chat', async (req, res) => {
       res.write('data: [DONE]\n\n');
       return res.end();
     } catch (err) {
-      console.warn(`Model ${model} failed, trying next...`);
+      lastError = err.message || 'Busy';
+      console.warn(`Model ${model} error: ${lastError}`);
     }
   }
 
-  res.write(`data: ${JSON.stringify({ text: '\n\n⚠️ Models busy. Please try again.' })}\n\n`);
+  res.write(`data: ${JSON.stringify({ text: `\n\n⚠️ Error: ${lastError}` })}\n\n`);
   res.write('data: [DONE]\n\n');
   res.end();
 });
