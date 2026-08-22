@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const { OpenAI } = require('openai');
+const path = require('path');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -9,24 +10,20 @@ app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ limit: '20mb', extended: true }));
 app.use(express.static(__dirname));
 
-const apiKey = process.env.API_KEY || process.env.OPENROUTER_API_KEY;
+const apiKey = process.env.API_KEY || process.env.GROQ_API_KEY;
 
+// Groq OpenAI-Compatible Client
 const openai = new OpenAI({
   apiKey: apiKey,
-  baseURL: 'https://openrouter.ai/api/v1',
-  defaultHeaders: {
-    'HTTP-Referer': 'https://titan-ai-bwzi.onrender.com',
-    'X-Title': 'Titan AI',
-  }
+  baseURL: 'https://api.groq.com/openai/v1',
 });
 
-// Priority Free Models List
-const FREE_MODELS = [
-  'google/gemini-2.0-flash-exp:free',
-  'meta-llama/llama-3.1-8b-instruct:free',
-  'mistralai/mistral-7b-instruct:free',
-  'deepseek/deepseek-r1:free',
-  'qwen/qwen-2.5-coder-32b-instruct:free'
+// Groq 100% Free High-Speed Models
+const GROQ_MODELS = [
+  'llama-3.3-70b-versatile',
+  'llama-3.1-8b-instant',
+  'mixtral-8x7b-32768',
+  'gemma2-9b-it'
 ];
 
 app.post('/api/chat', async (req, res) => {
@@ -37,20 +34,20 @@ app.post('/api/chat', async (req, res) => {
   res.setHeader('Connection', 'keep-alive');
 
   if (!apiKey) {
-    res.write(`data: ${JSON.stringify({ text: '⚠️ API Key is missing! Please configure API_KEY in Render.' })}\n\n`);
+    res.write(`data: ${JSON.stringify({ text: '⚠️ Groq API Key missing! Add API_KEY in Render Environment.' })}\n\n`);
     res.write('data: [DONE]\n\n');
     return res.end();
   }
 
   const systemPrompt = {
     role: 'system',
-    content: 'You are Titan AI. Give helpful, concise and direct responses. Do not output Arabic.'
+    content: 'You are Titan AI, an intelligent, sleek, and helpful AI assistant. Always reply directly in clear English or the user-requested language (Tamil/Hindi). Never output Arabic.'
   };
 
   const payload = [systemPrompt, ...messages.filter(m => m.role !== 'system')];
   let lastError = '';
 
-  for (const model of FREE_MODELS) {
+  for (const model of GROQ_MODELS) {
     try {
       const stream = await openai.chat.completions.create({
         model: model,
@@ -68,13 +65,12 @@ app.post('/api/chat', async (req, res) => {
       res.write('data: [DONE]\n\n');
       return res.end();
     } catch (err) {
-      lastError = err.message || 'Rate limit';
-      console.warn(`Model ${model} failed: ${lastError}`);
+      lastError = err.message || 'Groq busy';
+      console.warn(`Model ${model} failed, switching to next Groq model...`);
     }
   }
 
-  // If daily 429 quota is reached
-  res.write(`data: ${JSON.stringify({ text: `\n\n⚠️ **Daily Free Quota Reached (429)**\nOpenRouter free tier limit over aagiruchu. [openrouter.ai](https://openrouter.ai/keys)-la pudhu free key create panni Render-la update pannunga.` })}\n\n`);
+  res.write(`data: ${JSON.stringify({ text: `\n\n⚠️ Error: ${lastError}` })}\n\n`);
   res.write('data: [DONE]\n\n');
   res.end();
 });
