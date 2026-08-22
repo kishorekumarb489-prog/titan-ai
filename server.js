@@ -1,7 +1,6 @@
 require('dotenv').config();
 const express = require('express');
 const { OpenAI } = require('openai');
-const path = require('path');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -12,18 +11,15 @@ app.use(express.static(__dirname));
 
 const apiKey = process.env.API_KEY || process.env.GROQ_API_KEY;
 
-// Groq OpenAI-Compatible Client
 const openai = new OpenAI({
   apiKey: apiKey,
   baseURL: 'https://api.groq.com/openai/v1',
 });
 
-// Groq 100% Free High-Speed Models
+// Active, fully supported models on Groq
 const GROQ_MODELS = [
   'llama-3.3-70b-versatile',
-  'llama-3.1-8b-instant',
-  'mixtral-8x7b-32768',
-  'gemma2-9b-it'
+  'llama-3.1-8b-instant'
 ];
 
 app.post('/api/chat', async (req, res) => {
@@ -34,14 +30,14 @@ app.post('/api/chat', async (req, res) => {
   res.setHeader('Connection', 'keep-alive');
 
   if (!apiKey) {
-    res.write(`data: ${JSON.stringify({ text: '⚠️ Groq API Key missing! Add API_KEY in Render Environment.' })}\n\n`);
+    res.write(`data: ${JSON.stringify({ text: '⚠️ API Key is missing in Render Environment!' })}\n\n`);
     res.write('data: [DONE]\n\n');
     return res.end();
   }
 
   const systemPrompt = {
     role: 'system',
-    content: 'You are Titan AI, an intelligent, sleek, and helpful AI assistant. Always reply directly in clear English or the user-requested language (Tamil/Hindi). Never output Arabic.'
+    content: 'You are Titan AI, a helpful, intelligent AI assistant. Respond in clear English or the user-requested language (Tamil/Hindi). Do not output Arabic.'
   };
 
   const payload = [systemPrompt, ...messages.filter(m => m.role !== 'system')];
@@ -66,7 +62,7 @@ app.post('/api/chat', async (req, res) => {
       return res.end();
     } catch (err) {
       lastError = err.message || 'Groq busy';
-      console.warn(`Model ${model} failed, switching to next Groq model...`);
+      console.warn(`Model ${model} failed, switching to backup...`);
     }
   }
 
