@@ -9,18 +9,32 @@ app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ limit: '20mb', extended: true }));
 app.use(express.static(__dirname));
 
-const apiKey = process.env.API_KEY || process.env.GROQ_API_KEY;
+const apiKey = (process.env.API_KEY || process.env.GROQ_API_KEY || process.env.OPENROUTER_API_KEY || '').trim();
+
+// Auto-detect Groq vs OpenRouter based on Key prefix
+const isGroq = apiKey.startsWith('gsk_');
 
 const openai = new OpenAI({
   apiKey: apiKey,
-  baseURL: 'https://api.groq.com/openai/v1',
+  baseURL: isGroq ? 'https://api.groq.com/openai/v1' : 'https://openrouter.ai/api/v1',
+  defaultHeaders: isGroq ? {} : {
+    'HTTP-Referer': 'https://titan-ai-bwzi.onrender.com',
+    'X-Title': 'Titan AI',
+  }
 });
 
-// Active, fully supported models on Groq
-const GROQ_MODELS = [
-  'llama-3.3-70b-versatile',
-  'llama-3.1-8b-instant'
-];
+// Active model lists
+const ACTIVE_MODELS = isGroq
+  ? [
+      'llama-3.3-70b-versatile',
+      'llama-3.1-8b-instant',
+      'deepseek-r1-distill-llama-70b'
+    ]
+  : [
+      'meta-llama/llama-3.1-8b-instruct:free',
+      'meta-llama/llama-3.3-70b-instruct:free',
+      'mistralai/mistral-7b-instruct:free'
+    ];
 
 app.post('/api/chat', async (req, res) => {
   const { messages } = req.body;
@@ -30,20 +44,20 @@ app.post('/api/chat', async (req, res) => {
   res.setHeader('Connection', 'keep-alive');
 
   if (!apiKey) {
-    res.write(`data: ${JSON.stringify({ text: '⚠️ API Key is missing in Render Environment!' })}\n\n`);
+    res.write(`data: ${JSON.stringify({ text: '⚠️ API Key is missing! Check Render Environment variables.' })}\n\n`);
     res.write('data: [DONE]\n\n');
     return res.end();
   }
 
   const systemPrompt = {
     role: 'system',
-    content: 'You are Titan AI, a helpful, intelligent AI assistant. Respond in clear English or the user-requested language (Tamil/Hindi). Do not output Arabic.'
+    content: 'You are Titan AI, a helpful AI assistant. Always respond directly in clear English or the user-requested language. Do not output Arabic.'
   };
 
   const payload = [systemPrompt, ...messages.filter(m => m.role !== 'system')];
   let lastError = '';
 
-  for (const model of GROQ_MODELS) {
+  for (const model of ACTIVE_MODELS) {
     try {
       const stream = await openai.chat.completions.create({
         model: model,
@@ -61,7 +75,7 @@ app.post('/api/chat', async (req, res) => {
       res.write('data: [DONE]\n\n');
       return res.end();
     } catch (err) {
-      lastError = err.message || 'Groq busy';
+      lastError = err.message || 'Model unavailable';
       console.warn(`Model ${model} failed, switching to backup...`);
     }
   }
