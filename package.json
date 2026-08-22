@@ -1,15 +1,14 @@
 {
-  "name": "my-ai",
+  "name": "titan-ai",
   "version": "1.0.0",
-  "description": "MyAI Assistant with Groq API",
+  "description": "Titan Multilingual AI",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "openai": "^4.55.0"
+    "openai": "^4.47.1"
   }
 }
