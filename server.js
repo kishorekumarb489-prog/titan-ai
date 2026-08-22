@@ -16,19 +16,33 @@ const openai = new OpenAI({
   apiKey: apiKey,
   baseURL: 'https://openrouter.ai/api/v1',
   defaultHeaders: {
-    'HTTP-Referer': 'https://titan-ai.onrender.com',
+    'HTTP-Referer': 'https://titan-ai-bwzi.onrender.com',
     'X-Title': 'Titan AI',
   }
 });
 
-// Active 100% Free Models on OpenRouter
-const FREE_MODELS = [
-  'meta-llama/llama-3.1-8b-instruct:free',
-  'google/gemini-2.0-flash-exp:free',
-  'deepseek/deepseek-r1:free',
-  'mistralai/mistral-7b-instruct:free',
-  'qwen/qwen-2.5-72b-instruct:free'
-];
+// Live-a active-a irukra 100% Free models-a fetch panra function
+async function getWorkingFreeModels() {
+  try {
+    const res = await fetch('https://openrouter.ai/api/v1/models');
+    const data = await res.json();
+    const liveFreeModels = data.data
+      .filter(m => m.id.endsWith(':free'))
+      .map(m => m.id);
+
+    if (liveFreeModels.length > 0) {
+      return liveFreeModels;
+    }
+  } catch (err) {
+    console.warn('Live fetch failed, using fallback list.');
+  }
+
+  // Backup active models
+  return [
+    'meta-llama/llama-3.1-8b-instruct:free',
+    'mistralai/mistral-7b-instruct:free'
+  ];
+}
 
 app.post('/api/chat', async (req, res) => {
   const { messages } = req.body;
@@ -38,21 +52,23 @@ app.post('/api/chat', async (req, res) => {
   res.setHeader('Connection', 'keep-alive');
 
   if (!apiKey) {
-    res.write(`data: ${JSON.stringify({ text: '⚠️ API Key is missing in Render Environment Variables! Please add API_KEY.' })}\n\n`);
+    res.write(`data: ${JSON.stringify({ text: '⚠️ API Key is missing! Check Render Environment Variables.' })}\n\n`);
     res.write('data: [DONE]\n\n');
     return res.end();
   }
 
   const systemPrompt = {
     role: 'system',
-    content: 'You are Titan AI. Respond directly and clearly in English or the requested Indian language (Tamil/Hindi). Do not output Arabic.'
+    content: 'You are Titan AI. Respond clearly in English or the requested language (Tamil/Hindi). Do not output Arabic.'
   };
 
   const payload = [systemPrompt, ...messages.filter(m => m.role !== 'system')];
+  const activeModels = await getWorkingFreeModels();
   let lastError = '';
 
-  for (const model of FREE_MODELS) {
+  for (const model of activeModels) {
     try {
+      console.log(`Connecting to: ${model}`);
       const stream = await openai.chat.completions.create({
         model: model,
         messages: payload,
@@ -69,8 +85,8 @@ app.post('/api/chat', async (req, res) => {
       res.write('data: [DONE]\n\n');
       return res.end();
     } catch (err) {
-      lastError = err.message || 'Busy';
-      console.warn(`Model ${model} error: ${lastError}`);
+      lastError = err.message || 'Model unavailable';
+      console.warn(`Model ${model} failed, switching to next free model...`);
     }
   }
 
