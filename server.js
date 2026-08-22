@@ -11,7 +11,7 @@ app.use(express.static(__dirname));
 
 const apiKey = (process.env.API_KEY || process.env.GROQ_API_KEY || process.env.OPENROUTER_API_KEY || '').trim();
 
-// Auto-detect Groq vs OpenRouter based on Key prefix
+// Auto-detect Groq vs OpenRouter
 const isGroq = apiKey.startsWith('gsk_');
 
 const openai = new OpenAI({
@@ -23,16 +23,15 @@ const openai = new OpenAI({
   }
 });
 
-// Active model lists
+// 100% Active Production Models
 const ACTIVE_MODELS = isGroq
   ? [
       'llama-3.3-70b-versatile',
-      'llama-3.1-8b-instant',
-      'deepseek-r1-distill-llama-70b'
+      'llama-3.1-8b-instant'
     ]
   : [
-      'meta-llama/llama-3.1-8b-instruct:free',
       'meta-llama/llama-3.3-70b-instruct:free',
+      'meta-llama/llama-3.1-8b-instruct:free',
       'mistralai/mistral-7b-instruct:free'
     ];
 
@@ -44,14 +43,14 @@ app.post('/api/chat', async (req, res) => {
   res.setHeader('Connection', 'keep-alive');
 
   if (!apiKey) {
-    res.write(`data: ${JSON.stringify({ text: '⚠️ API Key is missing! Check Render Environment variables.' })}\n\n`);
+    res.write(`data: ${JSON.stringify({ text: '⚠️ API Key is missing in Render Environment!' })}\n\n`);
     res.write('data: [DONE]\n\n');
     return res.end();
   }
 
   const systemPrompt = {
     role: 'system',
-    content: 'You are Titan AI, a helpful AI assistant. Always respond directly in clear English or the user-requested language. Do not output Arabic.'
+    content: 'You are Titan AI, an intelligent, helpful, and concise AI assistant. Respond directly in clear English or the user-requested language. Do not output Arabic.'
   };
 
   const payload = [systemPrompt, ...messages.filter(m => m.role !== 'system')];
