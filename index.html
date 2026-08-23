@@ -16,193 +16,129 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body class="notranslate">
 
   <div class="mobile-container">
     
-    <!-- SCREEN 1: DASHBOARD -->
+    <!-- SCREEN 1: HOME DASHBOARD -->
     <section class="app-screen active" id="homeScreen">
-      <div class="screen-header home-header">
+      <div class="screen-header">
         <div class="user-greeting">
           <div class="avatar-ring">
-            <img id="homeUserAvatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=TitanUser" alt="Avatar" class="header-avatar">
+            <img id="homeUserAvatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=TitanAIUser" alt="Avatar" class="header-avatar">
           </div>
           <div>
-            <span class="greeting-subtitle">Titan AI Assistant</span>
-            <h4 class="greeting-name" id="homeUserName">Welcome Back</h4>
+            <span class="greeting-subtitle" id="greetingSub">Hi Amelia,</span>
+            <h4 class="greeting-name">Titan AI Assistant</h4>
           </div>
         </div>
+        <div id="googleBtnContainer"></div>
+      </div>
 
-        <div class="header-icons">
-          <div id="googleBtnContainer"></div>
-          <button class="icon-circle-btn" id="notifBtn">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
-            <span class="badge-dot"></span>
-          </button>
+      <!-- HERO 3D ORB CENTERPIECE -->
+      <div class="hero-orb-wrapper">
+        <div class="iridescent-orb-sm" id="homeOrbTrigger" title="Tap for Voice Mode"></div>
+        <p class="hero-subtext">Ask any question you have - your AI voice chatbot is always listening!</p>
+      </div>
+
+      <!-- 2X2 GLASS BENTO CARDS -->
+      <div class="glass-bento-grid">
+        <div class="glass-bento-card" id="cardVoiceChat">
+          <div class="bento-icon-title">🎙️ Voice Chat AI</div>
+          <p>Real-time conversational voice interaction.</p>
+        </div>
+
+        <div class="glass-bento-card" id="cardChatAI">
+          <div class="bento-icon-title">💬 Chat With AI</div>
+          <p>Intelligent Llama 3.3 text assistant.</p>
+        </div>
+
+        <div class="glass-bento-card" id="cardCameraScan">
+          <div class="bento-icon-title">📷 Scan & Search</div>
+          <p>Live camera object and text recognition.</p>
+        </div>
+
+        <div class="glass-bento-card" id="cardReasoning">
+          <div class="bento-icon-title">⚡ Deep Reasoning</div>
+          <p>Step-by-step logic and code generation.</p>
         </div>
       </div>
 
-      <div class="hero-text-block">
-        <h2>Next-Generation Creative<br>Experience.</h2>
-      </div>
-
-      <div class="search-capsule" id="homeSearchTrigger">
-        <input type="text" placeholder="Ask Titan anything..." readonly>
-        <button class="search-circle-btn">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-        </button>
-      </div>
-
-      <div class="bento-grid">
-        <div class="bento-card" id="cardNewChat">
-          <div class="bento-top">
-            <div class="bento-icon-box purple-tint">💬</div>
-            <span class="arrow-diagonal">↗</span>
-          </div>
-          <h3>New Chat</h3>
-          <p>Instant human-like AI conversations.</p>
-        </div>
-
-        <div class="bento-card" id="cardCameraVision">
-          <div class="bento-top">
-            <div class="bento-icon-box pink-tint">📷</div>
-            <span class="arrow-diagonal">↗</span>
-          </div>
-          <h3>Live Camera</h3>
-          <p>Scan documents & visual capture.</p>
-        </div>
-
-        <div class="bento-card" id="cardVoiceLive">
-          <div class="bento-top">
-            <div class="bento-icon-box blue-tint">🎙️</div>
-            <span class="arrow-diagonal">↗</span>
-          </div>
-          <h3>Voice Live</h3>
-          <p>Holographic orb voice assistant.</p>
-        </div>
-
-        <div class="bento-card" id="cardDeepResearch">
-          <div class="bento-top">
-            <div class="bento-icon-box cyan-tint">⚡</div>
-            <span class="arrow-diagonal">↗</span>
-          </div>
-          <h3>Deep Reasoning</h3>
-          <p>Step-by-step logic & coding.</p>
-        </div>
-      </div>
-
-      <div class="home-history-section">
-        <div class="history-header-row">
-          <h3>Recent Sessions</h3>
-        </div>
-        <div class="home-history-list" id="homeRecentHistoryList"></div>
+      <!-- BOTTOM SEARCH CAPSULE -->
+      <div class="bottom-search-capsule" id="homeSearchTrigger">
+        <input type="text" id="homeInput" placeholder="Ask anything..." readonly>
+        <button class="sparkle-send-btn">✦</button>
       </div>
     </section>
 
     <!-- SCREEN 2: CHAT CONVERSATION -->
     <section class="app-screen" id="chatScreen">
-      <div class="screen-header chat-header">
-        <button class="back-circle-btn" id="chatBackBtn">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-        </button>
-        <h3 class="header-nav-title">AI Assistant</h3>
-        <button class="icon-circle-btn" id="newChatTopBtn" title="Reset">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
-        </button>
+      <div class="screen-header">
+        <button class="back-circle-btn" id="chatBackBtn">←</button>
+        <h3 class="greeting-name">Smart Chat</h3>
+        <button class="icon-circle-btn" id="newChatTopBtn">↺</button>
       </div>
 
       <div class="chat-viewport" id="chatViewport"></div>
 
       <div class="chat-bottom-deck">
         <div class="action-pill-carousel">
-          <button class="deck-pill" id="deckVoiceModeBtn">🎙️ Voice Mode</button>
-          <button class="deck-pill" id="deckCameraBtn">📷 Live Camera</button>
-          <button class="deck-pill" id="deckReasoningBtn">💡 Reasoning</button>
+          <button class="deck-pill" id="deckVoiceBtn">🎙️ Voice Mode</button>
+          <button class="deck-pill" id="deckCamBtn">📷 Live Camera</button>
+          <button class="deck-pill" id="deckReasonBtn">💡 Reasoning</button>
         </div>
 
-        <div class="glowing-input-card">
-          <div class="attachment-bar" id="attachmentBar" style="display: none;">
-            <div class="attachment-pill">
-              <span id="fileIcon">📎</span>
-              <span id="fileName">file.txt</span>
-              <button id="removeFileBtn">✕</button>
-            </div>
+        <div class="attachment-bar" id="attachmentBar" style="display: none; margin-bottom: 8px;">
+          <div class="action-pill-carousel">
+            <span id="fileName" style="font-size: 12px; color: var(--primary-purple); font-weight: 600;">file.txt</span>
+            <button id="removeFileBtn" style="border:none; background:none; color:red; cursor:pointer; font-weight:bold;">✕</button>
           </div>
+        </div>
 
-          <div class="input-text-row">
-            <span class="sparkle-symbol">✦</span>
-            <textarea id="userInput" placeholder="Ask anything..." rows="1"></textarea>
-          </div>
-
-          <div class="input-controls-row">
-            <div class="left-controls">
-              <input type="file" id="filePicker" accept="image/*,.txt,.js,.py,.html,.css,.json,.md,.csv" hidden>
-              <button class="tool-circle-btn" id="attachBtn" title="Attach Document/Photo">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-              </button>
-              <button class="tool-circle-btn" id="camActionBtn" title="Open Live Camera">📷</button>
-            </div>
-
-            <div class="right-controls">
-              <button class="mic-action-btn" id="micBtn" title="Speech Input">
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path></svg>
-              </button>
-              <button class="send-action-btn" id="sendBtn" disabled title="Send">
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
-              </button>
-            </div>
-          </div>
+        <div class="input-core-row">
+          <input type="file" id="filePicker" accept="image/*,.txt,.js,.py,.html,.css,.json" hidden>
+          <button class="tool-btn" id="attachBtn" title="Upload">📎</button>
+          <textarea id="userInput" placeholder="Type a message..." rows="1"></textarea>
+          <button class="mic-action-btn" id="micBtn" title="Speech">🎙️</button>
+          <button class="send-action-btn" id="sendBtn" disabled title="Send">➤</button>
         </div>
       </div>
     </section>
 
-    <!-- SCREEN 3: HOLOGRAPHIC VOICE -->
+    <!-- SCREEN 3: VOICE MODE (HOLOGRAPHIC ORB) -->
     <section class="app-screen" id="voiceScreen">
-      <div class="screen-header voice-header">
-        <button class="back-circle-btn" id="voiceBackBtn">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-        </button>
-        <h3 class="header-nav-title">AI Voice Live</h3>
+      <div class="screen-header">
+        <button class="back-circle-btn" id="voiceBackBtn">←</button>
+        <h3 class="greeting-name">Voice Chat</h3>
         <button class="icon-circle-btn" id="voiceCloseScreenBtn">✕</button>
       </div>
 
-      <div class="orb-stage-wrapper">
-        <div class="iridescent-orb-container">
-          <div class="orb-aura"></div>
-          <div class="iridescent-orb">
-            <div class="orb-inner-light"></div>
-            <div class="orb-highlight"></div>
-          </div>
-        </div>
-
-        <div class="voice-transcript-card">
-          <h3 id="voiceTranscriptText">"Tap microphone and speak to Titan AI..."</h3>
+      <div class="voice-stage">
+        <div class="massive-iridescent-orb"></div>
+        <div class="voice-transcript-box">
+          <h3 id="voiceTranscriptText">Listening... Speak your thought daily.</h3>
         </div>
       </div>
 
-      <div class="voice-controls-footer">
-        <button class="large-glowing-mic-btn" id="voiceMainMicBtn">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line></svg>
-        </button>
+      <div class="voice-footer-bar">
+        <button class="huge-mic-btn" id="voiceMainMicBtn">🎙️</button>
       </div>
     </section>
 
-    <!-- LIVE CAMERA MODAL VIEW -->
+    <!-- LIVE CAMERA MODAL -->
     <div id="cameraModal" class="camera-modal-backdrop" style="display: none;">
       <div class="camera-modal-content">
-        <div class="cam-modal-header">
+        <div class="cam-header">
           <span>Live Camera Scanner</span>
           <button id="closeCamModalBtn">✕</button>
         </div>
         <video id="camVideo" autoplay playsinline muted></video>
         <canvas id="camCanvas" style="display: none;"></canvas>
-        <div class="cam-controls">
-          <button class="snap-btn" id="snapPhotoBtn">📸 Capture & Attach</button>
+        <div class="cam-footer">
+          <button class="capture-btn" id="snapPhotoBtn">📸 Capture & Analyze</button>
         </div>
       </div>
     </div>
