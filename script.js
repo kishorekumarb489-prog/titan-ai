@@ -33,6 +33,11 @@ const cardLiveVision = document.getElementById('cardLiveVision');
 const cardDeepReason = document.getElementById('cardDeepReason');
 const homeSearchTrigger = document.getElementById('homeSearchTrigger');
 
+// Languages Dropdowns
+const globalLangSelector = document.getElementById('globalLangSelector');
+const liveLangSelector = document.getElementById('liveLangSelector');
+let currentLanguage = 'en-IN';
+
 // Smart Chat Elements
 const chatViewport = document.getElementById('chatViewport');
 const userInput = document.getElementById('userInput');
@@ -54,15 +59,18 @@ const fileStatusBadge = document.getElementById('fileStatusBadge');
 const removeFileBtn = document.getElementById('removeFileBtn');
 
 // Gemini Live Multimodal Elements
+const cameraPipCard = document.getElementById('cameraPipCard');
 const liveCamVideo = document.getElementById('liveCamVideo');
 const liveCamCanvas = document.getElementById('liveCamCanvas');
 const liveOrbElement = document.getElementById('liveOrbElement');
-const liveTranscriptText = document.getElementById('liveTranscriptText');
+const liveTranscriptFeed = document.getElementById('liveTranscriptFeed');
+const liveBotCurrentSpeech = document.getElementById('liveBotCurrentSpeech');
 const liveStatusText = document.getElementById('liveStatusText');
 const livePulseDot = document.getElementById('livePulseDot');
 
 const liveBackBtn = document.getElementById('liveBackBtn');
 const liveToggleCamBtn = document.getElementById('liveToggleCamBtn');
+const camIconText = document.getElementById('camIconText');
 const liveMuteBtn = document.getElementById('liveMuteBtn');
 const muteIcon = document.getElementById('muteIcon');
 const livePauseBtn = document.getElementById('livePauseBtn');
@@ -86,7 +94,25 @@ function showScreen(screen) {
   screen.classList.add('active');
 }
 
-// 1. MANDATORY GOOGLE AUTH GATE
+// 1. LANGUAGE SYNC HANDLER
+function syncLanguage(lang) {
+  currentLanguage = lang;
+  if (globalLangSelector) globalLangSelector.value = lang;
+  if (liveLangSelector) liveLangSelector.value = lang;
+  if (recognition) recognition.lang = lang;
+}
+
+if (globalLangSelector) {
+  globalLangSelector.addEventListener('change', (e) => syncLanguage(e.target.value));
+}
+if (liveLangSelector) {
+  liveLangSelector.addEventListener('change', (e) => {
+    syncLanguage(e.target.value);
+    liveStatusText.innerText = `Language set to ${liveLangSelector.options[liveLangSelector.selectedIndex].text}`;
+  });
+}
+
+// 2. MANDATORY GOOGLE AUTH GATE
 function parseJwt(token) {
   try {
     const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
@@ -144,7 +170,7 @@ window.onload = function() {
   }
 };
 
-// 2. DOCUMENT PARSERS (PDF, DOCX, TXT, IMAGES)
+// 3. DOCUMENT PARSERS (PDF, DOCX, TXT, IMAGES)
 async function parsePDF(arrayBuffer) {
   const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
   const pdf = await loadingTask.promise;
@@ -185,20 +211,12 @@ filePicker.addEventListener('change', async (e) => {
       fileIcon.innerText = '📕';
       const arrayBuffer = await file.arrayBuffer();
       const extractedText = await parsePDF(arrayBuffer);
-      attachedFile = {
-        type: 'pdf',
-        name: file.name,
-        content: extractedText.slice(0, 30000)
-      };
+      attachedFile = { type: 'pdf', name: file.name, content: extractedText.slice(0, 30000) };
     } else if (ext === 'docx' || ext === 'doc') {
       fileIcon.innerText = '📘';
       const arrayBuffer = await file.arrayBuffer();
       const extractedText = await parseDOCX(arrayBuffer);
-      attachedFile = {
-        type: 'docx',
-        name: file.name,
-        content: extractedText.slice(0, 30000)
-      };
+      attachedFile = { type: 'docx', name: file.name, content: extractedText.slice(0, 30000) };
     } else if (file.type.startsWith('image/')) {
       fileIcon.innerText = '🖼️';
       const base64 = await new Promise((res) => {
@@ -206,33 +224,23 @@ filePicker.addEventListener('change', async (e) => {
         reader.onload = () => res(reader.result);
         reader.readAsDataURL(file);
       });
-      attachedFile = {
-        type: 'image',
-        name: file.name,
-        content: base64
-      };
+      attachedFile = { type: 'image', name: file.name, content: base64 };
     } else {
-      // Code, TXT, CSV, JSON
       fileIcon.innerText = '📄';
       const text = await file.text();
-      attachedFile = {
-        type: 'text',
-        name: file.name,
-        content: text.slice(0, 30000)
-      };
+      attachedFile = { type: 'text', name: file.name, content: text.slice(0, 30000) };
     }
 
     fileStatusBadge.innerText = "Ready";
     fileStatusBadge.className = "file-status ready";
     sendBtn.disabled = false;
     if (!userInput.value.trim()) {
-      userInput.value = `Summarize and analyze the main insights from ${file.name}`;
+      userInput.value = `Summarize and analyze key takeaways from ${file.name}`;
       userInput.focus();
     }
   } catch (err) {
     fileStatusBadge.innerText = "Failed";
     fileStatusBadge.className = "file-status error";
-    alert(`Could not parse document: ${err.message}`);
   }
 });
 
@@ -243,16 +251,17 @@ removeFileBtn.addEventListener('click', () => {
   sendBtn.disabled = !userInput.value.trim();
 });
 
-// 3. CONTINUOUS SPEECH RECOGNITION (WITH AUTO-BARGE-IN)
+// 4. CONTINUOUS MULTILINGUAL SPEECH RECOGNITION (AUTO BARGE-IN)
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recognition = null;
 
 if (SpeechRecognition) {
   recognition = new SpeechRecognition();
-  recognition.lang = 'en-IN';
+  recognition.lang = currentLanguage;
   recognition.continuous = false;
   recognition.interimResults = false;
 
+  // Auto-Interrupt: User speech cuts off AI output instantly
   recognition.onspeechstart = () => {
     if (window.speechSynthesis.speaking) {
       window.speechSynthesis.cancel();
@@ -272,7 +281,7 @@ if (SpeechRecognition) {
     const speech = event.results[0][0].transcript;
     if (speech.trim() && !isPaused && !isMuted) {
       if (isLiveSessionRunning) {
-        liveTranscriptText.innerText = `"${speech}"`;
+        appendLiveFeedItem(speech, 'user');
         await handleLiveStreamingExchange(speech);
       } else {
         userInput.value = speech;
@@ -285,27 +294,31 @@ if (SpeechRecognition) {
     if (isLiveSessionRunning && !isPaused && !isMuted && !window.speechSynthesis.speaking) {
       setTimeout(() => {
         if (isLiveSessionRunning && !isPaused && !isMuted) {
-          try { recognition.start(); } catch (e) {}
+          try {
+            recognition.lang = currentLanguage;
+            recognition.start();
+          } catch (e) {}
         }
       }, 350);
     }
   };
 }
 
-// 4. LIVE CAMERA STREAM CONTROLS
+// 5. PICTURE-IN-PICTURE LIVE CAMERA STREAM CONTROLS
 async function enableLiveCamera() {
   try {
     liveStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+      video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } },
       audio: false
     });
     liveCamVideo.srcObject = liveStream;
-    liveCamVideo.style.display = 'block';
-    liveOrbElement.style.display = 'none';
+    cameraPipCard.style.display = 'block';
     isCameraActive = true;
-    liveToggleCamBtn.classList.add('btn-active-state');
+    liveToggleCamBtn.classList.add('active-cam');
+    camIconText.innerText = '📷 ON';
+    liveStatusText.innerText = "Live Vision Active";
   } catch (err) {
-    alert("Camera permission denied or unavailable.");
+    alert("Camera permission denied or camera unavailable.");
   }
 }
 
@@ -314,10 +327,10 @@ function disableLiveCamera() {
     liveStream.getTracks().forEach(t => t.stop());
     liveStream = null;
   }
-  liveCamVideo.style.display = 'none';
-  liveOrbElement.style.display = 'block';
+  cameraPipCard.style.display = 'none';
   isCameraActive = false;
-  liveToggleCamBtn.classList.remove('btn-active-state');
+  liveToggleCamBtn.classList.remove('active-cam');
+  camIconText.innerText = '📷';
 }
 
 liveToggleCamBtn.addEventListener('click', () => {
@@ -327,32 +340,42 @@ liveToggleCamBtn.addEventListener('click', () => {
 
 function captureCameraFrame() {
   if (!isCameraActive || !liveCamVideo.videoWidth) return null;
-  liveCamCanvas.width = liveCamVideo.videoWidth;
-  liveCamCanvas.height = liveCamVideo.videoHeight;
+  liveCamCanvas.width = 480;
+  liveCamCanvas.height = 360;
   const ctx = liveCamCanvas.getContext('2d');
-  ctx.drawImage(liveCamVideo, 0, 0);
-  return liveCamCanvas.toDataURL('image/jpeg', 0.7);
+  ctx.drawImage(liveCamVideo, 0, 0, 480, 360);
+  return liveCamCanvas.toDataURL('image/jpeg', 0.6);
 }
 
-// 5. START & END GEMINI LIVE SESSION
+// 6. START & END GEMINI LIVE SESSION
 async function startGeminiLive(withCamera = false) {
   isLiveSessionRunning = true;
   isPaused = false;
   isMuted = false;
   
   muteIcon.innerText = "🎙️";
-  liveMuteBtn.classList.remove('btn-active-state');
+  liveMuteBtn.classList.remove('active-state');
   pauseIcon.innerText = "⏸️";
-  livePauseBtn.classList.remove('btn-pause-state');
+  livePauseBtn.classList.remove('active-state');
+
+  liveTranscriptFeed.innerHTML = `
+    <div class="live-feed-bubble bot">
+      <span class="bubble-tag">✦ Titan Live</span>
+      <p>Listening in ${liveLangSelector.options[liveLangSelector.selectedIndex].text}... Speak anytime!</p>
+    </div>
+  `;
 
   showScreen(liveScreen);
-  liveTranscriptText.innerText = "Titan is ready. Start speaking...";
+  syncLanguage(currentLanguage);
 
   if (withCamera) await enableLiveCamera();
   else disableLiveCamera();
 
   if (window.speechSynthesis) window.speechSynthesis.cancel();
-  try { recognition && recognition.start(); } catch (e) {}
+  try {
+    recognition.lang = currentLanguage;
+    recognition.start();
+  } catch (e) {}
 }
 
 function endGeminiLive() {
@@ -367,17 +390,19 @@ function endGeminiLive() {
 liveEndBtn.addEventListener('click', endGeminiLive);
 liveBackBtn.addEventListener('click', endGeminiLive);
 
-// 6. INTERRUPT, MUTE & PAUSE CONTROLS
+// 7. LIVE DOCK CONTROLS (INTERRUPT, MUTE, PAUSE)
 liveInterruptBtn.addEventListener('click', () => {
   if (window.speechSynthesis) window.speechSynthesis.cancel();
   if (liveAbortController) liveAbortController.abort();
   
-  liveTranscriptText.innerText = "Interrupted! Listening to you...";
-  liveStatusText.innerText = "Ready • Speak now";
+  liveStatusText.innerText = "Interrupted! Listening to you...";
   livePulseDot.style.background = "#a855f7";
 
   if (!isPaused && !isMuted) {
-    try { recognition && recognition.start(); } catch (e) {}
+    try {
+      recognition.lang = currentLanguage;
+      recognition.start();
+    } catch (e) {}
   }
 });
 
@@ -386,16 +411,19 @@ liveMuteBtn.addEventListener('click', () => {
   if (isMuted) {
     if (recognition) recognition.stop();
     muteIcon.innerText = "🔇";
-    liveMuteBtn.classList.add('btn-active-state');
+    liveMuteBtn.classList.add('active-state');
     liveStatusText.innerText = "Microphone Muted";
     livePulseDot.style.background = "#ef4444";
   } else {
     muteIcon.innerText = "🎙️";
-    liveMuteBtn.classList.remove('btn-active-state');
+    liveMuteBtn.classList.remove('active-state');
     liveStatusText.innerText = "Listening...";
     livePulseDot.style.background = "#22c55e";
     if (!isPaused && !window.speechSynthesis.speaking) {
-      try { recognition && recognition.start(); } catch (e) {}
+      try {
+        recognition.lang = currentLanguage;
+        recognition.start();
+      } catch (e) {}
     }
   }
 });
@@ -406,24 +434,39 @@ livePauseBtn.addEventListener('click', () => {
     if (recognition) recognition.stop();
     if (window.speechSynthesis) window.speechSynthesis.pause();
     pauseIcon.innerText = "▶️";
-    livePauseBtn.classList.add('btn-pause-state');
+    livePauseBtn.classList.add('active-state');
     liveStatusText.innerText = "Session Paused";
     livePulseDot.style.background = "#eab308";
   } else {
     pauseIcon.innerText = "⏸️";
-    livePauseBtn.classList.remove('btn-pause-state');
+    livePauseBtn.classList.remove('active-state');
     liveStatusText.innerText = "Resumed";
     livePulseDot.style.background = "#22c55e";
     
     if (window.speechSynthesis.paused) {
       window.speechSynthesis.resume();
     } else if (!window.speechSynthesis.speaking && !isMuted) {
-      try { recognition && recognition.start(); } catch (e) {}
+      try {
+        recognition.lang = currentLanguage;
+        recognition.start();
+      } catch (e) {}
     }
   }
 });
 
-// 7. MULTIMODAL EXCHANGE DISPATCH
+function appendLiveFeedItem(text, role) {
+  const item = document.createElement('div');
+  item.className = `live-feed-bubble ${role}`;
+  item.innerHTML = `
+    <span class="bubble-tag">${role === 'user' ? '👤 You' : '✦ Titan'}</span>
+    <p>${text}</p>
+  `;
+  liveTranscriptFeed.appendChild(item);
+  liveTranscriptFeed.scrollTop = liveTranscriptFeed.scrollHeight;
+  return item.querySelector('p');
+}
+
+// 8. MULTIMODAL EXCHANGE DISPATCH
 async function handleLiveStreamingExchange(userSpeech) {
   if (liveAbortController) liveAbortController.abort();
   liveAbortController = new AbortController();
@@ -442,11 +485,16 @@ async function handleLiveStreamingExchange(userSpeech) {
   liveStatusText.innerText = "Titan Thinking...";
   livePulseDot.style.background = "#a855f7";
 
+  const botFeedP = appendLiveFeedItem("...", 'bot');
+
   try {
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages: chats[currentChatId].messages }),
+      body: JSON.stringify({ 
+        messages: chats[currentChatId].messages,
+        language: currentLanguage
+      }),
       signal: liveAbortController.signal
     });
 
@@ -464,7 +512,8 @@ async function handleLiveStreamingExchange(userSpeech) {
             const data = JSON.parse(line.replace('data: ', ''));
             if (data.text) {
               accumulated += data.text;
-              liveTranscriptText.innerHTML = marked.parse(accumulated);
+              botFeedP.innerText = accumulated;
+              liveTranscriptFeed.scrollTop = liveTranscriptFeed.scrollHeight;
             }
           } catch (e) {}
         }
@@ -476,9 +525,12 @@ async function handleLiveStreamingExchange(userSpeech) {
 
   } catch (err) {
     if (err.name !== 'AbortError') {
-      liveTranscriptText.innerText = "Re-listening...";
+      botFeedP.innerText = "Re-listening...";
       if (!isPaused && !isMuted) {
-        try { recognition && recognition.start(); } catch (e) {}
+        try {
+          recognition.lang = currentLanguage;
+          recognition.start();
+        } catch (e) {}
       }
     }
   }
@@ -490,6 +542,7 @@ function speakLiveResponse(text) {
 
   const clean = text.replace(/[*#`_~]/g, '').trim();
   const utterance = new SpeechSynthesisUtterance(clean);
+  utterance.lang = currentLanguage;
   utterance.rate = 1.05;
 
   utterance.onstart = () => {
@@ -501,15 +554,17 @@ function speakLiveResponse(text) {
     if (isLiveSessionRunning && !isPaused && !isMuted) {
       liveStatusText.innerText = "Listening...";
       livePulseDot.style.background = "#22c55e";
-      liveTranscriptText.innerText = "Listening to you...";
-      try { recognition && recognition.start(); } catch (e) {}
+      try {
+        recognition.lang = currentLanguage;
+        recognition.start();
+      } catch (e) {}
     }
   };
 
   window.speechSynthesis.speak(utterance);
 }
 
-// 8. SMART CHAT & DOCUMENT QUERY DISPATCH
+// 9. SMART CHAT & DOCUMENT QUERY DISPATCH
 async function handleSend() {
   const text = userInput.value.trim();
   if (!text && !attachedFile) return;
@@ -540,7 +595,10 @@ async function handleSend() {
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages: chats[currentChatId].messages })
+      body: JSON.stringify({ 
+        messages: chats[currentChatId].messages,
+        language: currentLanguage
+      })
     });
 
     const reader = res.body.getReader();
@@ -623,5 +681,8 @@ userInput.addEventListener('input', () => {
 });
 
 micBtn.addEventListener('click', () => {
-  try { recognition && recognition.start(); } catch {}
+  try {
+    recognition.lang = currentLanguage;
+    recognition.start();
+  } catch {}
 });
