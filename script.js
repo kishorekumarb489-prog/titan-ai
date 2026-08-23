@@ -1,22 +1,18 @@
-// ==========================================
-// 0. PWA SERVICE WORKER REGISTRATION
-// ==========================================
+// Register Service Worker
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js')
-      .then(() => console.log('Titan AI Service Worker Registered!'))
-      .catch((err) => console.log('SW registration failed:', err));
+      .then(() => console.log('Titan AI PWA Active'))
+      .catch((err) => console.log('SW registration error:', err));
   });
 }
 
 const GOOGLE_CLIENT_ID = "1027901085880-ltncq1or8f5lupuvnd7g1ea8uq4ierf9.apps.googleusercontent.com";
 
-// Screen Views
+// Elements
 const homeScreen = document.getElementById('homeScreen');
 const chatScreen = document.getElementById('chatScreen');
 const voiceScreen = document.getElementById('voiceScreen');
-
-// Home Screen Elements
 const homeUserName = document.getElementById('homeUserName');
 const homeUserAvatar = document.getElementById('homeUserAvatar');
 const homeSearchTrigger = document.getElementById('homeSearchTrigger');
@@ -26,7 +22,6 @@ const cardVoiceLive = document.getElementById('cardVoiceLive');
 const cardLiveWeather = document.getElementById('cardLiveWeather');
 const homeRecentHistoryList = document.getElementById('homeRecentHistoryList');
 
-// Chat Screen Elements
 const chatViewport = document.getElementById('chatViewport');
 const userInput = document.getElementById('userInput');
 const sendBtn = document.getElementById('sendBtn');
@@ -42,7 +37,6 @@ const attachmentBar = document.getElementById('attachmentBar');
 const fileName = document.getElementById('fileName');
 const removeFileBtn = document.getElementById('removeFileBtn');
 
-// Voice Screen Elements
 const voiceBackBtn = document.getElementById('voiceBackBtn');
 const voiceCloseScreenBtn = document.getElementById('voiceCloseScreenBtn');
 const voiceMainMicBtn = document.getElementById('voiceMainMicBtn');
@@ -53,13 +47,24 @@ let isLiveModeActive = false;
 let currentChatId = Date.now().toString();
 let chats = JSON.parse(localStorage.getItem('titan_ai_sessions') || '{}');
 
-// Screen Router
 function showScreen(screen) {
   [homeScreen, chatScreen, voiceScreen].forEach(s => s.classList.remove('active'));
   screen.classList.add('active');
 }
 
-// Home Triggers
+// System Permission Trigger
+async function requestDevicePermissions() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    stream.getTracks().forEach(track => track.stop());
+    return true;
+  } catch (err) {
+    console.warn("Permission denied:", err);
+    return false;
+  }
+}
+
+// Navigation Events
 homeSearchTrigger.addEventListener('click', () => {
   showScreen(chatScreen);
   userInput.focus();
@@ -74,11 +79,12 @@ cardNewChat.addEventListener('click', () => {
 
 cardDeepResearch.addEventListener('click', () => {
   showScreen(chatScreen);
-  userInput.value = "Conduct a deep analytical research on: ";
+  userInput.value = "Conduct deep analytical research on: ";
   userInput.focus();
 });
 
-cardVoiceLive.addEventListener('click', () => {
+cardVoiceLive.addEventListener('click', async () => {
+  await requestDevicePermissions();
   startLiveVoiceSession();
 });
 
@@ -91,26 +97,28 @@ cardLiveWeather.addEventListener('click', async () => {
 chatBackBtn.addEventListener('click', () => showScreen(homeScreen));
 newChatTopBtn.addEventListener('click', () => cardNewChat.click());
 
-deckVoiceModeBtn.addEventListener('click', () => startLiveVoiceSession());
+deckVoiceModeBtn.addEventListener('click', async () => {
+  await requestDevicePermissions();
+  startLiveVoiceSession();
+});
+
 deckReasoningBtn.addEventListener('click', () => {
   userInput.value = "Think step-by-step with deep reasoning: " + userInput.value;
   userInput.focus();
 });
+
 deckCodeBtn.addEventListener('click', () => {
   userInput.value = "Write clean, optimized code for: " + userInput.value;
   userInput.focus();
 });
 
-// Auto Resize Input
 userInput.addEventListener('input', () => {
   userInput.style.height = 'auto';
   userInput.style.height = Math.min(userInput.scrollHeight, 100) + 'px';
   sendBtn.disabled = !userInput.value.trim() && !attachedFile;
 });
 
-// ==========================================
-// 1. GOOGLE IDENTITY SIGN-IN
-// ==========================================
+// Google Identity
 function parseJwt(token) {
   try {
     const base64Url = token.split('.')[1];
@@ -154,13 +162,10 @@ window.onload = function() {
   renderHomeHistory();
 };
 
-// ==========================================
-// 2. LIVE WEATHER & SENSORS
-// ==========================================
+// Weather Context
 async function getLiveWeatherContext() {
   return new Promise((resolve) => {
     if (!navigator.geolocation) return resolve('');
-
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         try {
@@ -180,9 +185,7 @@ async function getLiveWeatherContext() {
   });
 }
 
-// ==========================================
-// 3. GROQ STREAMING & DISPATCH
-// ==========================================
+// Chat Streaming
 async function handleSend(isLive = false) {
   const text = userInput.value.trim();
   if (!text && !attachedFile) return;
@@ -280,9 +283,7 @@ userInput.addEventListener('keydown', (e) => {
 });
 
 function parseMarkdown(text) {
-  if (typeof marked !== 'undefined') {
-    return marked.parse(text);
-  }
+  if (typeof marked !== 'undefined') return marked.parse(text);
   return text.replace(/\n/g, '<br>');
 }
 
@@ -317,9 +318,7 @@ function escapeHtml(text) {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-// ==========================================
-// 4. HOLOGRAPHIC ORB GEMINI LIVE VOICE
-// ==========================================
+// Voice Mode
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recognition = null;
 let isListening = false;
@@ -380,12 +379,14 @@ voiceCloseScreenBtn.addEventListener('click', () => {
 
 voiceBackBtn.addEventListener('click', () => voiceCloseScreenBtn.click());
 
-voiceMainMicBtn.addEventListener('click', () => {
+voiceMainMicBtn.addEventListener('click', async () => {
+  await requestDevicePermissions();
   if (isListening) recognition.stop();
   else recognition.start();
 });
 
-micBtn.addEventListener('click', () => {
+micBtn.addEventListener('click', async () => {
+  await requestDevicePermissions();
   if (!recognition) return;
   if (isListening) recognition.stop();
   else recognition.start();
@@ -413,9 +414,7 @@ window.speakText = function(btn, text, isLive = false) {
   window.speechSynthesis.speak(utterance);
 };
 
-// ==========================================
-// 5. ATTACHMENTS & HISTORY
-// ==========================================
+// Attachments & History
 attachBtn.addEventListener('click', () => filePicker.click());
 
 filePicker.addEventListener('change', (e) => {
