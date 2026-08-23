@@ -1,27 +1,12 @@
 {
-  "name": "Titan AI - Creative Voice Assistant",
-  "short_name": "Titan AI",
-  "description": "Next-Generation Creative and Voice AI Assistant powered by Groq and Llama 3.3.",
-  "id": "/",
-  "start_url": "/",
-  "scope": "/",
-  "display": "standalone",
-  "orientation": "portrait",
   "background_color": "#f9f5ff",
+  "dir": "ltr",
+  "display": "standalone",
+  "name": "Titan Ai",
+  "orientation": "any",
+  "scope": "/",
+  "short_name": "Titan AI",
+  "start_url": "/",
   "theme_color": "#7c3aed",
-  "icons": [
-    {
-      "src": "https://api.dicebear.com/7.x/bottts/png?seed=TitanAI&size=192",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "https://api.dicebear.com/7.x/bottts/png?seed=TitanAI&size=512",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    }
-  ],
-  "categories": ["productivity", "utilities"]
+  "description": "Next-Gen Voice AI Assistant"
 }
