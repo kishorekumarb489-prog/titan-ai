@@ -22,26 +22,18 @@ app.get('/sw.js', (req, res) => {
   res.sendFile(path.join(__dirname, 'sw.js'));
 });
 
-// Accurate Key & Provider Auto-Detection
+// Strict Provider & Key Check
 const rawKey = process.env.GROQ_API_KEY || process.env.OPENROUTER_API_KEY || process.env.API_KEY || '';
 const apiKey = rawKey.trim();
 
+// Determine Provider strictly by key prefix
 const isGroq = apiKey.startsWith('gsk_');
 
 const baseURL = isGroq 
   ? 'https://api.groq.com/openai/v1' 
   : 'https://openrouter.ai/api/v1';
 
-const openai = new OpenAI({
-  apiKey: apiKey || 'dummy-key',
-  baseURL: baseURL,
-  defaultHeaders: isGroq ? {} : {
-    'HTTP-Referer': 'https://titan-ai-bwzi.onrender.com',
-    'X-Title': 'Titan AI',
-  }
-});
-
-// Strictly Separated Valid Models
+// Provider-Specific Models (Never Mixed)
 const GROQ_MODELS = [
   'llama-3.3-70b-versatile',
   'llama-3.1-8b-instant'
@@ -53,6 +45,19 @@ const OPENROUTER_MODELS = [
   'meta-llama/llama-3.2-3b-instruct:free'
 ];
 
+const activeModels = isGroq ? GROQ_MODELS : OPENROUTER_MODELS;
+
+const openai = new OpenAI({
+  apiKey: apiKey || 'dummy-key',
+  baseURL: baseURL,
+  defaultHeaders: isGroq ? {} : {
+    'HTTP-Referer': 'https://titan-ai-bwzi.onrender.com',
+    'X-Title': 'Titan AI',
+  }
+});
+
+console.log(`[Titan AI] Provider: ${isGroq ? 'GROQ' : 'OPENROUTER'} | Active Model: ${activeModels[0]}`);
+
 app.post('/api/chat', async (req, res) => {
   const { messages } = req.body;
 
@@ -61,17 +66,17 @@ app.post('/api/chat', async (req, res) => {
   res.setHeader('Connection', 'keep-alive');
 
   if (!apiKey || apiKey === 'dummy-key') {
-    res.write(`data: ${JSON.stringify({ text: '⚠️ API Key is missing! Set GROQ_API_KEY or OPENROUTER_API_KEY in Render.' })}\n\n`);
+    res.write(`data: ${JSON.stringify({ text: '⚠️ API Key is missing! Set GROQ_API_KEY in Render.' })}\n\n`);
     res.write('data: [DONE]\n\n');
     return res.end();
   }
 
   const systemPrompt = {
     role: 'system',
-    content: 'You are Titan AI. Provide direct, concise, and structured responses using Markdown.'
+    content: 'You are Titan AI. Give direct, crisp, concise, and structured answers in Markdown.'
   };
 
-  // Sanitize payloads so attached documents/photos don't break text completions
+  // Convert array payloads safely to text
   const sanitizedMessages = (messages || []).map(m => {
     if (Array.isArray(m.content)) {
       const textPart = m.content.find(c => c.type === 'text')?.text || '';
@@ -84,12 +89,10 @@ app.post('/api/chat', async (req, res) => {
   });
 
   const payload = [systemPrompt, ...sanitizedMessages.filter(m => m.role !== 'system')];
-  const targetModels = isGroq ? GROQ_MODELS : OPENROUTER_MODELS;
-
   let lastError = '';
   let streamSuccess = false;
 
-  for (const model of targetModels) {
+  for (const model of activeModels) {
     try {
       const stream = await openai.chat.completions.create({
         model: model,
@@ -111,7 +114,7 @@ app.post('/api/chat', async (req, res) => {
       return res.end();
     } catch (err) {
       lastError = err.message || 'Execution error';
-      console.warn(`[${isGroq ? 'Groq' : 'OpenRouter'}] Model ${model} failed (${lastError}), switching fallback...`);
+      console.warn(`[${isGroq ? 'Groq' : 'OpenRouter'}] ${model} failed (${lastError}), trying next...`);
     }
   }
 
@@ -127,5 +130,5 @@ app.get('*', (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`Titan AI online on port ${port} | Provider: ${isGroq ? 'Groq Official' : 'OpenRouter Official'}`);
+  console.log(`Titan AI online on port ${port}`);
 });
