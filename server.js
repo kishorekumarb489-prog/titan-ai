@@ -22,44 +22,50 @@ app.get('/sw.js', (req, res) => {
   res.sendFile(path.join(__dirname, 'sw.js'));
 });
 
-// Detect provider ONLY by key prefix (never by variable name)
 const rawKey = process.env.GROQ_API_KEY || process.env.OPENROUTER_API_KEY || process.env.API_KEY || '';
 const apiKey = rawKey.trim();
-
 const isGroqKey = apiKey.startsWith('gsk_');
 
-// 1. Groq Configuration
-const GROQ_CONFIG = {
-  baseURL: 'https://api.groq.com/openai/v1',
-  models: [
-    'llama-3.3-70b-versatile',
-    'llama-3.1-8b-instant'
-  ],
-  headers: {}
-};
-
-// 2. OpenRouter Configuration
-const OPENROUTER_CONFIG = {
-  baseURL: 'https://openrouter.ai/api/v1',
-  models: [
-    'meta-llama/llama-3.3-70b-instruct:free',
-    'google/gemini-2.0-flash-exp:free',
-    'meta-llama/llama-3.2-3b-instruct:free',
-    'meta-llama/llama-3.1-8b-instruct:free'
-  ],
-  headers: {
-    'HTTP-Referer': 'https://titan-ai-bwzi.onrender.com',
-    'X-Title': 'Titan AI',
-  }
-};
-
-const activeConfig = isGroqKey ? GROQ_CONFIG : OPENROUTER_CONFIG;
+const baseURL = isGroqKey ? 'https://api.groq.com/openai/v1' : 'https://openrouter.ai/api/v1';
 
 const openai = new OpenAI({
   apiKey: apiKey || 'dummy-key',
-  baseURL: activeConfig.baseURL,
-  defaultHeaders: activeConfig.headers
+  baseURL: baseURL,
+  defaultHeaders: isGroqKey ? {} : {
+    'HTTP-Referer': 'https://titan-ai-bwzi.onrender.com',
+    'X-Title': 'Titan AI',
+  }
 });
+
+// Dynamic Model List Storage
+let activeModels = isGroqKey ? ['llama-3.3-70b-versatile'] : ['meta-llama/llama-3.3-70b-instruct:free'];
+
+// Dynamically fetch live available models from Groq/OpenRouter
+async function fetchActiveModels() {
+  if (!apiKey || apiKey === 'dummy-key') return;
+  try {
+    const res = await fetch(`${baseURL}/models`, {
+      headers: { 'Authorization': `Bearer ${apiKey}` }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const models = (data.data || []).map(m => m.id);
+      if (models.length > 0) {
+        // Filter out non-chat models
+        const chatModels = models.filter(id => !id.includes('whisper') && !id.includes('embed') && !id.includes('guard'));
+        if (chatModels.length > 0) {
+          activeModels = chatModels;
+          console.log(`[Titan AI] Auto-discovered ${chatModels.length} active models from API.`);
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[Titan AI] Model auto-fetch warning:', err.message);
+  }
+}
+
+// Fetch models immediately on boot
+fetchActiveModels();
 
 app.post('/api/chat', async (req, res) => {
   const { messages } = req.body;
@@ -69,17 +75,16 @@ app.post('/api/chat', async (req, res) => {
   res.setHeader('Connection', 'keep-alive');
 
   if (!apiKey || apiKey === 'dummy-key') {
-    res.write(`data: ${JSON.stringify({ text: '⚠️ API Key is missing! Set your API key in Render Environment Variables.' })}\n\n`);
+    res.write(`data: ${JSON.stringify({ text: '⚠️ API Key is missing! Set GROQ_API_KEY in Render Environment Variables.' })}\n\n`);
     res.write('data: [DONE]\n\n');
     return res.end();
   }
 
   const systemPrompt = {
     role: 'system',
-    content: 'You are Titan AI, an advanced, high-speed assistant. Format responses clearly using Markdown.'
+    content: 'You are Titan AI, an advanced, high-speed assistant. Format responses cleanly using Markdown.'
   };
 
-  // Convert array payloads (multimodal/attachments) to clean text
   const sanitizedMessages = (messages || []).map(m => {
     if (Array.isArray(m.content)) {
       const textPart = m.content.find(c => c.type === 'text')?.text || '';
@@ -95,7 +100,14 @@ app.post('/api/chat', async (req, res) => {
   let lastError = '';
   let streamSuccess = false;
 
-  for (const model of activeConfig.models) {
+  // Prioritize larger/versatile models first
+  const sortedModels = [...activeModels].sort((a, b) => {
+    if (a.includes('70b') || a.includes('versatile')) return -1;
+    if (b.includes('70b') || b.includes('versatile')) return 1;
+    return 0;
+  });
+
+  for (const model of sortedModels) {
     try {
       const stream = await openai.chat.completions.create({
         model: model,
@@ -115,15 +127,35 @@ app.post('/api/chat', async (req, res) => {
       return res.end();
     } catch (err) {
       lastError = err.message || 'Execution error';
-      console.warn(`[${isGroqKey ? 'Groq' : 'OpenRouter'}] Model ${model} failed (${lastError}), trying next fallback...`);
+      console.warn(`[Titan AI] Model ${model} failed (${lastError}), trying next fallback...`);
     }
   }
 
+  // If failed, re-fetch models once and retry top 2
   if (!streamSuccess) {
-    res.write(`data: ${JSON.stringify({ text: `\n\n⚠️ AI Error: ${lastError}` })}\n\n`);
-    res.write('data: [DONE]\n\n');
-    res.end();
+    await fetchActiveModels();
+    for (const model of activeModels.slice(0, 2)) {
+      try {
+        const stream = await openai.chat.completions.create({
+          model: model,
+          messages: payload,
+          stream: true,
+        });
+        for await (const chunk of stream) {
+          const content = chunk.choices[0]?.delta?.content || '';
+          if (content) {
+            res.write(`data: ${JSON.stringify({ text: content })}\n\n`);
+          }
+        }
+        res.write('data: [DONE]\n\n');
+        return res.end();
+      } catch (e) {}
+    }
   }
+
+  res.write(`data: { "text": "\n\n⚠️ AI Error: ${lastError}" }\n\n`);
+  res.write('data: [DONE]\n\n');
+  res.end();
 });
 
 app.get('*', (req, res) => {
@@ -131,5 +163,5 @@ app.get('*', (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`Titan AI online on port ${port} | Active Provider: ${isGroqKey ? 'Groq Official' : 'OpenRouter Official'}`);
+  console.log(`Titan AI online on port ${port} | Auto-Discovery Engine Active`);
 });
