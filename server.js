@@ -25,7 +25,7 @@ app.get('/sw.js', (req, res) => {
 // Accurate Provider Detection
 const rawKey = process.env.GROQ_API_KEY || process.env.OPENROUTER_API_KEY || process.env.API_KEY || '';
 const apiKey = rawKey.trim();
-const isGroq = apiKey.startsWith('gsk_');
+const isGroq = apiKey.startsWith('gsk_') || Boolean(process.env.GROQ_API_KEY);
 
 const openai = new OpenAI({
   apiKey: apiKey || 'dummy-key',
@@ -36,11 +36,10 @@ const openai = new OpenAI({
   }
 });
 
-// Provider-Specific Verified Models
+// 100% Active Production Models (Zero Decommissioned Models)
 const GROQ_MODELS = [
   'llama-3.3-70b-versatile',
-  'llama-3.1-8b-instant',
-  'llama-3.2-11b-vision-preview'
+  'llama-3.1-8b-instant'
 ];
 
 let OPENROUTER_MODELS = [
@@ -50,7 +49,7 @@ let OPENROUTER_MODELS = [
   'meta-llama/llama-3.1-8b-instruct:free'
 ];
 
-// Dynamically sync active free models if using OpenRouter
+// OpenRouter Dynamic Sync
 async function syncOpenRouterModels() {
   if (isGroq || !apiKey || apiKey === 'dummy-key') return;
   try {
@@ -64,11 +63,10 @@ async function syncOpenRouterModels() {
         .filter(id => id && id.endsWith(':free'));
       if (liveFree.length > 0) {
         OPENROUTER_MODELS = liveFree;
-        console.log(`[OpenRouter] Synced ${liveFree.length} active free models.`);
       }
     }
   } catch (err) {
-    console.warn('[OpenRouter] Dynamic sync fallback active:', err.message);
+    console.warn('[OpenRouter] Dynamic sync warning:', err.message);
   }
 }
 syncOpenRouterModels();
@@ -81,17 +79,29 @@ app.post('/api/chat', async (req, res) => {
   res.setHeader('Connection', 'keep-alive');
 
   if (!apiKey || apiKey === 'dummy-key') {
-    res.write(`data: ${JSON.stringify({ text: '⚠️ API Key is missing! Add GROQ_API_KEY or OPENROUTER_API_KEY in Render Environment Variables.' })}\n\n`);
+    res.write(`data: ${JSON.stringify({ text: '⚠️ API Key is missing! Set GROQ_API_KEY in Render Environment Variables.' })}\n\n`);
     res.write('data: [DONE]\n\n');
     return res.end();
   }
 
   const systemPrompt = {
     role: 'system',
-    content: 'You are Titan AI, an intelligent, high-speed assistant. Provide well-structured markdown answers.'
+    content: 'You are Titan AI, a fast, intelligent, and creative assistant. Provide clean, well-structured markdown answers.'
   };
 
-  const payload = [systemPrompt, ...messages.filter(m => m.role !== 'system')];
+  // Sanitize messages so image payloads don't throw 400 on text models
+  const sanitizedMessages = (messages || []).map(m => {
+    if (Array.isArray(m.content)) {
+      const textPart = m.content.find(c => c.type === 'text')?.text || '';
+      return {
+        role: m.role,
+        content: `[Attached Media/Photo]\n${textPart || 'Describe and analyze this query.'}`
+      };
+    }
+    return m;
+  });
+
+  const payload = [systemPrompt, ...sanitizedMessages.filter(m => m.role !== 'system')];
   const targetModels = isGroq ? GROQ_MODELS : OPENROUTER_MODELS;
 
   let lastError = '';
@@ -116,8 +126,8 @@ app.post('/api/chat', async (req, res) => {
       res.write('data: [DONE]\n\n');
       return res.end();
     } catch (err) {
-      lastError = err.message || 'Model failed';
-      console.warn(`[${isGroq ? 'Groq' : 'OpenRouter'}] ${model} error: ${lastError}. Trying next...`);
+      lastError = err.message || 'Model execution error';
+      console.warn(`[${isGroq ? 'Groq' : 'OpenRouter'}] ${model} error: ${lastError}. Switching to fallback...`);
     }
   }
 
@@ -133,5 +143,5 @@ app.get('*', (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`Titan AI online on port ${port} | Active Provider: ${isGroq ? 'Groq (Ultra-Fast)' : 'OpenRouter'}`);
+  console.log(`Titan AI online on port ${port} | Provider: ${isGroq ? 'Groq Llama 3.3 Production' : 'OpenRouter'}`);
 });
