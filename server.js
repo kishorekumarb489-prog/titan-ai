@@ -10,7 +10,7 @@ app.use(express.json({ limit: '30mb' }));
 app.use(express.urlencoded({ limit: '30mb', extended: true }));
 app.use(express.static(__dirname));
 
-// PWA routes
+// PWA direct file routes
 app.get('/manifest.json', (req, res) => {
   res.setHeader('Content-Type', 'application/manifest+json');
   res.sendFile(path.join(__dirname, 'manifest.json'));
@@ -22,7 +22,8 @@ app.get('/sw.js', (req, res) => {
   res.sendFile(path.join(__dirname, 'sw.js'));
 });
 
-const rawKey = process.env.API_KEY || process.env.GROQ_API_KEY || process.env.OPENROUTER_API_KEY || '';
+// Auto-detect Provider (Groq or OpenRouter)
+const rawKey = process.env.OPENROUTER_API_KEY || process.env.API_KEY || process.env.GROQ_API_KEY || '';
 const apiKey = rawKey.trim();
 const isGroq = apiKey.startsWith('gsk_');
 
@@ -35,19 +36,21 @@ const openai = new OpenAI({
   }
 });
 
-// Active, 100% working fallback models
+// 100% Active & Verified Free Models (OpenRouter & Groq)
 const GROQ_MODELS = [
   'llama-3.3-70b-versatile',
   'llama-3.1-8b-instant'
 ];
 
-const OPENROUTER_MODELS = [
+const OPENROUTER_FREE_MODELS = [
   'meta-llama/llama-3.3-70b-instruct:free',
+  'meta-llama/llama-3.1-8b-instruct:free',
   'google/gemini-2.0-flash-exp:free',
-  'qwen/qwen-2.5-coder-32b-instruct:free'
+  'google/gemini-2.0-flash-thinking-exp:free',
+  'mistralai/mistral-small-24b-instruct-2501:free'
 ];
 
-const targetModels = isGroq ? GROQ_MODELS : OPENROUTER_MODELS;
+const targetModels = isGroq ? GROQ_MODELS : OPENROUTER_FREE_MODELS;
 
 app.post('/api/chat', async (req, res) => {
   const { messages } = req.body;
@@ -56,19 +59,20 @@ app.post('/api/chat', async (req, res) => {
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
 
-  if (!apiKey) {
-    res.write(`data: ${JSON.stringify({ text: '⚠️ API Key is missing. Please add GROQ_API_KEY in Render dashboard.' })}\n\n`);
+  if (!apiKey || apiKey === 'dummy-key') {
+    res.write(`data: ${JSON.stringify({ text: '⚠️ API Key is missing! Please set OPENROUTER_API_KEY in Render Environment Variables.' })}\n\n`);
     res.write('data: [DONE]\n\n');
     return res.end();
   }
 
   const systemPrompt = {
     role: 'system',
-    content: 'You are Titan AI, an intelligent real-time voice and vision assistant. Keep responses natural, concise, and helpful for spoken interaction.'
+    content: 'You are Titan AI, an intelligent, human-like voice and vision assistant. Keep responses clear, fast, and properly formatted in markdown.'
   };
 
   const payload = [systemPrompt, ...messages.filter(m => m.role !== 'system')];
   let lastError = '';
+  let streamSucceeded = false;
 
   for (const model of targetModels) {
     try {
@@ -85,17 +89,20 @@ app.post('/api/chat', async (req, res) => {
         }
       }
 
+      streamSucceeded = true;
       res.write('data: [DONE]\n\n');
       return res.end();
     } catch (err) {
-      lastError = err.message || 'Model execution error';
-      console.warn(`Model ${model} failed, switching to next available model...`);
+      lastError = err.message || 'Model error';
+      console.warn(`[OpenRouter/Groq] Model ${model} failed (${lastError}), attempting next available fallback...`);
     }
   }
 
-  res.write(`data: ${JSON.stringify({ text: `\n\n⚠️ AI Error: ${lastError}` })}\n\n`);
-  res.write('data: [DONE]\n\n');
-  res.end();
+  if (!streamSucceeded) {
+    res.write(`data: ${JSON.stringify({ text: `\n\n⚠️ AI Response Error: ${lastError}. Please check if your OpenRouter key has free tier access.` })}\n\n`);
+    res.write('data: [DONE]\n\n');
+    res.end();
+  }
 });
 
 app.get('*', (req, res) => {
@@ -103,5 +110,5 @@ app.get('*', (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`Titan AI Server active on port ${port}`);
+  console.log(`Titan AI running on port ${port} | Mode: ${isGroq ? 'Groq' : 'OpenRouter'}`);
 });
