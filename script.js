@@ -54,19 +54,18 @@ let isSending = false;
 let isLiveModeActive = false;
 let isMicMuted = false;
 let isSessionPaused = false;
+let isAiSpeaking = false; // Prevents premature listening loop
 let isCameraActive = false;
 let cameraMediaStream = null;
 let userSpeakingTimeout = null;
 let currentChatId = Date.now().toString();
 let chats = JSON.parse(localStorage.getItem('titan_ai_sessions') || '{}');
 
-// Screen Router
 function showScreen(screen) {
   [homeScreen, chatScreen, voiceScreen].forEach(s => s.classList.remove('active'));
   screen.classList.add('active');
 }
 
-// Authentication Gate
 function enforceAuthentication() {
   const savedUser = localStorage.getItem('titan_user_profile');
   if (!savedUser) {
@@ -120,7 +119,6 @@ window.onload = function() {
   renderHomeHistory();
 };
 
-// Home Handlers
 homeSearchTrigger.addEventListener('click', () => {
   showScreen(chatScreen);
   userInput.focus();
@@ -184,7 +182,7 @@ cameraToggleBtn.addEventListener('click', async () => {
       cameraToggleBtn.innerText = '📷 Stop Cam';
       cameraContainer.style.display = 'block';
       orbContainer.style.display = 'none';
-      voiceTranscriptText.innerText = "Camera active! Ask anything about what I see.";
+      voiceTranscriptText.innerText = "Camera active! Speak to analyze view.";
     } catch (err) {
       alert("Camera permission is needed for live vision mode.");
     }
@@ -212,15 +210,24 @@ function captureCurrentCameraFrame() {
   return cameraCanvas.toDataURL('image/jpeg', 0.6);
 }
 
-// Single-Tap Instant Dispatch Lock
+// ==========================================
+// FAST SEND & REAL-TIME SPEECH SYNTHESIS
+// ==========================================
 async function handleSend(isLive = false) {
   const text = userInput.value.trim();
   if (!text || isSending) return;
 
   isSending = true;
+  isAiSpeaking = true; // Lock speech recognition during answer
   sendBtn.disabled = true;
 
-  if (isListening && recognition) recognition.stop();
+  if (recognition) {
+    try { recognition.stop(); } catch (e) {}
+  }
+
+  if (isLive || isLiveModeActive) {
+    voiceTranscriptText.innerText = "Thinking...";
+  }
 
   if (!chats[currentChatId]) {
     chats[currentChatId] = { title: text.slice(0, 24) || 'Session', messages: [] };
@@ -251,7 +258,7 @@ async function handleSend(isLive = false) {
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let accumulated = '';
-    let hasSpokenFirstSentence = false;
+    let hasStartedSpeaking = false;
 
     while (true) {
       const { done, value } = await reader.read();
@@ -267,8 +274,9 @@ async function handleSend(isLive = false) {
               botText.innerHTML = parseMarkdown(accumulated);
               chatViewport.scrollTop = chatViewport.scrollHeight;
 
-              if ((isLive || isLiveModeActive) && !hasSpokenFirstSentence && /[.?!]\s/.test(accumulated)) {
-                hasSpokenFirstSentence = true;
+              // Trigger speech as soon as first 40 characters or sentence end is reached
+              if ((isLive || isLiveModeActive) && !hasStartedSpeaking && (/[.?!,]|\n/.test(accumulated) || accumulated.length > 40)) {
+                hasStartedSpeaking = true;
                 voiceTranscriptText.innerHTML = parseMarkdown(accumulated);
                 window.speakText(accumulated, true);
               }
@@ -284,13 +292,18 @@ async function handleSend(isLive = false) {
 
     if (spkBtn) spkBtn.onclick = () => window.speakText(accumulated);
 
-    if ((isLive || isLiveModeActive) && !hasSpokenFirstSentence) {
+    if ((isLive || isLiveModeActive) && !hasStartedSpeaking) {
       voiceTranscriptText.innerHTML = parseMarkdown(accumulated);
       window.speakText(accumulated, true);
     }
 
   } catch {
     botText.innerHTML = '<span style="color:#ef4444;">⚠️ Connection failed.</span>';
+    if (isLive || isLiveModeActive) {
+      voiceTranscriptText.innerText = "Error connecting. Try speaking again.";
+      isAiSpeaking = false;
+      restartRecognitionSafe();
+    }
   } finally {
     isSending = false;
     sendBtn.disabled = !userInput.value.trim();
@@ -343,7 +356,9 @@ function escapeHtml(text) {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-// Live Voice Engine
+// ==========================================
+// HIGH-ACCURACY LIVE VOICE ENGINE (ZERO-DELAY)
+// ==========================================
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recognition = null;
 let isListening = false;
@@ -357,13 +372,13 @@ if (SpeechRecognition) {
   recognition.onstart = () => {
     isListening = true;
     micBtn.classList.add('listening');
-    if (isLiveModeActive && !isMicMuted && !isSessionPaused) {
+    if (isLiveModeActive && !isMicMuted && !isSessionPaused && !isAiSpeaking) {
       voiceTranscriptText.innerText = "Listening to you...";
     }
   };
 
   recognition.onresult = async (event) => {
-    if (isMicMuted || isSessionPaused) return;
+    if (isMicMuted || isSessionPaused || isAiSpeaking) return;
 
     let interimTranscript = '';
     let finalTranscript = '';
@@ -376,23 +391,20 @@ if (SpeechRecognition) {
 
     const detectedText = (finalTranscript || interimTranscript).trim();
 
-    if (detectedText.length > 4) {
-      if (window.speechSynthesis.speaking) {
-        window.speechSynthesis.cancel();
-      }
-
+    if (detectedText.length > 2) {
       if (isLiveModeActive) {
         voiceTranscriptText.innerHTML = `"${detectedText}"`;
       }
 
+      // Snappy 500ms silence detection
       clearTimeout(userSpeakingTimeout);
       userSpeakingTimeout = setTimeout(async () => {
-        if (detectedText.length > 3 && !isSending) {
+        if (detectedText.length > 2 && !isSending) {
           userInput.value = detectedText;
-          if (recognition) recognition.stop();
+          try { recognition.stop(); } catch (e) {}
           await handleSend(isLiveModeActive);
         }
-      }, 1000);
+      }, 550);
     }
   };
 
@@ -404,20 +416,25 @@ if (SpeechRecognition) {
   recognition.onend = () => {
     isListening = false;
     micBtn.classList.remove('listening');
-    if (isLiveModeActive && !window.speechSynthesis.speaking && !isMicMuted && !isSessionPaused) {
-      setTimeout(() => {
-        if (isLiveModeActive && !isMicMuted && !isSessionPaused) {
-          try { recognition.start(); } catch (e) {}
-        }
-      }, 300);
-    }
+    restartRecognitionSafe();
   };
 }
 
+function restartRecognitionSafe() {
+  if (isLiveModeActive && !isAiSpeaking && !isMicMuted && !isSessionPaused) {
+    setTimeout(() => {
+      if (isLiveModeActive && !isAiSpeaking && !isMicMuted && !isSessionPaused) {
+        try { recognition.start(); } catch (e) {}
+      }
+    }, 200);
+  }
+}
+
+// Live Controls
 voiceMuteBtn.addEventListener('click', () => {
   isMicMuted = !isMicMuted;
   if (isMicMuted) {
-    if (recognition) recognition.stop();
+    if (recognition) try { recognition.stop(); } catch (e) {}
     voiceMuteBtn.classList.add('muted');
     micOnIcon.style.display = 'none';
     micOffIcon.style.display = 'block';
@@ -427,16 +444,14 @@ voiceMuteBtn.addEventListener('click', () => {
     micOnIcon.style.display = 'block';
     micOffIcon.style.display = 'none';
     voiceTranscriptText.innerText = "Listening to you...";
-    if (isLiveModeActive && !isSessionPaused) {
-      try { recognition.start(); } catch (e) {}
-    }
+    restartRecognitionSafe();
   }
 });
 
 voicePauseBtn.addEventListener('click', () => {
   isSessionPaused = !isSessionPaused;
   if (isSessionPaused) {
-    if (recognition) recognition.stop();
+    if (recognition) try { recognition.stop(); } catch (e) {}
     if (window.speechSynthesis.speaking) window.speechSynthesis.cancel();
     voicePauseBtn.classList.add('paused');
     pauseIcon.style.display = 'none';
@@ -447,9 +462,7 @@ voicePauseBtn.addEventListener('click', () => {
     pauseIcon.style.display = 'block';
     playIcon.style.display = 'none';
     voiceTranscriptText.innerText = "Listening to you...";
-    if (isLiveModeActive && !isMicMuted) {
-      try { recognition.start(); } catch (e) {}
-    }
+    restartRecognitionSafe();
   }
 });
 
@@ -457,6 +470,7 @@ function startLiveVoiceSession() {
   isLiveModeActive = true;
   isMicMuted = false;
   isSessionPaused = false;
+  isAiSpeaking = false;
   voiceMuteBtn.classList.remove('muted');
   voicePauseBtn.classList.remove('paused');
   micOnIcon.style.display = 'block';
@@ -470,8 +484,9 @@ function startLiveVoiceSession() {
 
 voiceCloseScreenBtn.addEventListener('click', () => {
   isLiveModeActive = false;
+  isAiSpeaking = false;
   stopCameraStream();
-  if (recognition) recognition.stop();
+  if (recognition) try { recognition.stop(); } catch (e) {}
   if (window.speechSynthesis.speaking) window.speechSynthesis.cancel();
   showScreen(homeScreen);
 });
@@ -479,19 +494,22 @@ voiceCloseScreenBtn.addEventListener('click', () => {
 voiceBackBtn.addEventListener('click', () => voiceCloseScreenBtn.click());
 
 voiceMainMicBtn.addEventListener('click', () => {
-  if (isListening) recognition.stop();
-  else recognition.start();
+  if (isListening) try { recognition.stop(); } catch (e) {}
+  else try { recognition.start(); } catch (e) {}
 });
 
 micBtn.addEventListener('click', () => {
   if (!recognition) return;
-  if (isListening) recognition.stop();
-  else recognition.start();
+  if (isListening) try { recognition.stop(); } catch (e) {}
+  else try { recognition.start(); } catch (e) {}
 });
 
+// Fast Voice Output
 window.speakText = function(text, isLive = false) {
   if (!window.speechSynthesis) return;
   window.speechSynthesis.cancel();
+
+  isAiSpeaking = true;
 
   const cleanText = text
     .replace(/```[\s\S]*?```/g, 'Code block.')
@@ -499,13 +517,14 @@ window.speakText = function(text, isLive = false) {
     .trim();
 
   const utterance = new SpeechSynthesisUtterance(cleanText);
-  utterance.rate = 1.15;
+  utterance.rate = 1.2; // Accelerated natural pace
   utterance.pitch = 1.05;
 
   utterance.onend = () => {
-    if (isLiveModeActive && recognition && !isMicMuted && !isSessionPaused) {
+    isAiSpeaking = false;
+    if (isLiveModeActive && !isMicMuted && !isSessionPaused) {
       voiceTranscriptText.innerText = "Listening again...";
-      try { recognition.start(); } catch (e) {}
+      restartRecognitionSafe();
     }
   };
 
