@@ -1,9 +1,6 @@
-// Register Service Worker
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
-      .then(() => console.log('Titan AI PWA Active'))
-      .catch((err) => console.log('SW registration error:', err));
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
   });
 }
 
@@ -17,9 +14,9 @@ const homeUserName = document.getElementById('homeUserName');
 const homeUserAvatar = document.getElementById('homeUserAvatar');
 const homeSearchTrigger = document.getElementById('homeSearchTrigger');
 const cardNewChat = document.getElementById('cardNewChat');
-const cardDeepResearch = document.getElementById('cardDeepResearch');
+const cardCameraVision = document.getElementById('cardCameraVision');
 const cardVoiceLive = document.getElementById('cardVoiceLive');
-const cardLiveWeather = document.getElementById('cardLiveWeather');
+const cardDeepResearch = document.getElementById('cardDeepResearch');
 const homeRecentHistoryList = document.getElementById('homeRecentHistoryList');
 
 const chatViewport = document.getElementById('chatViewport');
@@ -29,8 +26,10 @@ const micBtn = document.getElementById('micBtn');
 const chatBackBtn = document.getElementById('chatBackBtn');
 const newChatTopBtn = document.getElementById('newChatTopBtn');
 const deckVoiceModeBtn = document.getElementById('deckVoiceModeBtn');
+const deckCameraBtn = document.getElementById('deckCameraBtn');
 const deckReasoningBtn = document.getElementById('deckReasoningBtn');
-const deckCodeBtn = document.getElementById('deckCodeBtn');
+const camActionBtn = document.getElementById('camActionBtn');
+
 const attachBtn = document.getElementById('attachBtn');
 const filePicker = document.getElementById('filePicker');
 const attachmentBar = document.getElementById('attachmentBar');
@@ -42,6 +41,14 @@ const voiceCloseScreenBtn = document.getElementById('voiceCloseScreenBtn');
 const voiceMainMicBtn = document.getElementById('voiceMainMicBtn');
 const voiceTranscriptText = document.getElementById('voiceTranscriptText');
 
+// Camera Modal Elements
+const cameraModal = document.getElementById('cameraModal');
+const camVideo = document.getElementById('camVideo');
+const camCanvas = document.getElementById('camCanvas');
+const snapPhotoBtn = document.getElementById('snapPhotoBtn');
+const closeCamModalBtn = document.getElementById('closeCamModalBtn');
+let cameraStream = null;
+
 let attachedFile = null;
 let isLiveModeActive = false;
 let currentChatId = Date.now().toString();
@@ -52,19 +59,52 @@ function showScreen(screen) {
   screen.classList.add('active');
 }
 
-// System Permission Trigger
-async function requestDevicePermissions() {
+// 1. LIVE CAMERA CAPTURE
+async function openLiveCamera() {
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    stream.getTracks().forEach(track => track.stop());
-    return true;
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment' },
+      audio: false
+    });
+    camVideo.srcObject = cameraStream;
+    cameraModal.style.display = 'flex';
   } catch (err) {
-    console.warn("Permission denied:", err);
-    return false;
+    alert("Camera permission denied or camera not supported on this device.");
   }
 }
 
-// Navigation Events
+function closeLiveCamera() {
+  if (cameraStream) {
+    cameraStream.getTracks().forEach(track => track.stop());
+    cameraStream = null;
+  }
+  cameraModal.style.display = 'none';
+}
+
+snapPhotoBtn.addEventListener('click', () => {
+  if (!camVideo.videoWidth) return;
+  camCanvas.width = camVideo.videoWidth;
+  camCanvas.height = camVideo.videoHeight;
+  const ctx = camCanvas.getContext('2d');
+  ctx.drawImage(camVideo, 0, 0, camCanvas.width, camCanvas.height);
+  
+  const photoData = camCanvas.toDataURL('image/jpeg', 0.85);
+  attachedFile = { type: 'image', name: 'camera_capture.jpg', content: photoData };
+  fileName.innerText = '📷 camera_capture.jpg';
+  attachmentBar.style.display = 'block';
+  sendBtn.disabled = false;
+  
+  closeLiveCamera();
+  showScreen(chatScreen);
+  userInput.focus();
+});
+
+closeCamModalBtn.addEventListener('click', closeLiveCamera);
+camActionBtn.addEventListener('click', openLiveCamera);
+if (deckCameraBtn) deckCameraBtn.addEventListener('click', openLiveCamera);
+if (cardCameraVision) cardCameraVision.addEventListener('click', openLiveCamera);
+
+// 2. NAVIGATION & SHORTCUTS
 homeSearchTrigger.addEventListener('click', () => {
   showScreen(chatScreen);
   userInput.focus();
@@ -79,38 +119,20 @@ cardNewChat.addEventListener('click', () => {
 
 cardDeepResearch.addEventListener('click', () => {
   showScreen(chatScreen);
-  userInput.value = "Conduct deep analytical research on: ";
+  userInput.value = "Think step-by-step with deep reasoning: ";
   userInput.focus();
 });
 
-cardVoiceLive.addEventListener('click', async () => {
-  await requestDevicePermissions();
-  startLiveVoiceSession();
-});
-
-cardLiveWeather.addEventListener('click', async () => {
-  showScreen(chatScreen);
-  userInput.value = "What is the live weather status for my current location?";
-  await handleSend();
-});
-
-chatBackBtn.addEventListener('click', () => showScreen(homeScreen));
-newChatTopBtn.addEventListener('click', () => cardNewChat.click());
-
-deckVoiceModeBtn.addEventListener('click', async () => {
-  await requestDevicePermissions();
-  startLiveVoiceSession();
-});
+cardVoiceLive.addEventListener('click', () => startLiveVoiceSession());
+deckVoiceModeBtn.addEventListener('click', () => startLiveVoiceSession());
 
 deckReasoningBtn.addEventListener('click', () => {
   userInput.value = "Think step-by-step with deep reasoning: " + userInput.value;
   userInput.focus();
 });
 
-deckCodeBtn.addEventListener('click', () => {
-  userInput.value = "Write clean, optimized code for: " + userInput.value;
-  userInput.focus();
-});
+chatBackBtn.addEventListener('click', () => showScreen(homeScreen));
+newChatTopBtn.addEventListener('click', () => cardNewChat.click());
 
 userInput.addEventListener('input', () => {
   userInput.style.height = 'auto';
@@ -118,74 +140,36 @@ userInput.addEventListener('input', () => {
   sendBtn.disabled = !userInput.value.trim() && !attachedFile;
 });
 
-// Google Identity
-function parseJwt(token) {
-  try {
-    const base64Url = token.split('.')[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    return JSON.parse(window.atob(base64));
-  } catch {
-    return null;
-  }
-}
+// 3. FILE ATTACHMENTS
+attachBtn.addEventListener('click', () => filePicker.click());
 
-window.handleCredentialResponse = function(response) {
-  const user = parseJwt(response.credential);
-  if (user) {
-    const profile = { name: user.name, picture: user.picture };
-    localStorage.setItem('titan_user_profile', JSON.stringify(profile));
-    loadUserProfile();
-  }
-};
+filePicker.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
 
-function loadUserProfile() {
-  const savedUser = localStorage.getItem('titan_user_profile');
-  if (savedUser) {
-    const user = JSON.parse(savedUser);
-    homeUserName.innerText = user.name || 'User';
-    if (user.picture) homeUserAvatar.src = user.picture;
-  }
-}
+  const reader = new FileReader();
+  reader.onload = () => {
+    attachedFile = {
+      type: file.type.startsWith('image') ? 'image' : 'doc',
+      name: file.name,
+      content: reader.result
+    };
+    fileName.innerText = file.name;
+    attachmentBar.style.display = 'block';
+    sendBtn.disabled = false;
+  };
+  if (file.type.startsWith('image')) reader.readAsDataURL(file);
+  else reader.readAsText(file);
+});
 
-window.onload = function() {
-  loadUserProfile();
-  if (window.google?.accounts?.id) {
-    google.accounts.id.initialize({
-      client_id: GOOGLE_CLIENT_ID,
-      callback: handleCredentialResponse,
-    });
-    google.accounts.id.renderButton(
-      document.getElementById('googleBtnContainer'),
-      { theme: 'outline', size: 'small', shape: 'pill' }
-    );
-  }
-  renderHomeHistory();
-};
+removeFileBtn.addEventListener('click', () => {
+  attachedFile = null;
+  filePicker.value = '';
+  attachmentBar.style.display = 'none';
+  sendBtn.disabled = !userInput.value.trim();
+});
 
-// Weather Context
-async function getLiveWeatherContext() {
-  return new Promise((resolve) => {
-    if (!navigator.geolocation) return resolve('');
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        try {
-          const lat = pos.coords.latitude;
-          const lon = pos.coords.longitude;
-          const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`);
-          const data = await res.json();
-          const cw = data.current_weather;
-          resolve(`[User Location: Lat ${lat.toFixed(2)}, Lon ${lon.toFixed(2)} | Temp: ${cw.temperature}°C, Wind: ${cw.windspeed}km/h | Time: ${new Date().toLocaleTimeString()}]`);
-        } catch {
-          resolve('');
-        }
-      },
-      () => resolve(''),
-      { timeout: 4000 }
-    );
-  });
-}
-
-// Chat Streaming
+// 4. STREAMING CHAT DISPATCH
 async function handleSend(isLive = false) {
   const text = userInput.value.trim();
   if (!text && !attachedFile) return;
@@ -196,25 +180,17 @@ async function handleSend(isLive = false) {
     chats[currentChatId] = { title: text.slice(0, 24) || 'AI Session', messages: [] };
   }
 
-  const weatherContext = await getLiveWeatherContext();
-  let fullPrompt = text;
-  if (weatherContext && !chats[currentChatId].hasSentWeather) {
-    fullPrompt = `${weatherContext}\n${text}`;
-    chats[currentChatId].hasSentWeather = true;
-  }
-
-  let payload;
-  if (attachedFile?.type === 'doc') {
-    payload = {
-      role: 'user',
-      content: `[File: ${attachedFile.name}]\n\`\`\`\n${attachedFile.content}\n\`\`\`\n${fullPrompt}`
-    };
-  } else {
-    payload = { role: 'user', content: fullPrompt };
+  let promptPayload = text;
+  if (attachedFile) {
+    if (attachedFile.type === 'image') {
+      promptPayload = `[Image Attached: ${attachedFile.name}]\n${text || 'Describe and analyze this captured image.'}`;
+    } else {
+      promptPayload = `[File: ${attachedFile.name}]\n\`\`\`\n${attachedFile.content.slice(0, 8000)}\n\`\`\`\n${text}`;
+    }
   }
 
   appendUserBubble(text || `Attached: ${attachedFile?.name}`);
-  chats[currentChatId].messages.push(payload);
+  chats[currentChatId].messages.push({ role: 'user', content: promptPayload });
 
   userInput.value = '';
   userInput.style.height = 'auto';
@@ -223,7 +199,6 @@ async function handleSend(isLive = false) {
   const botRow = appendBotBubble();
   const botText = botRow.querySelector('.bot-text');
   const spkBtn = botRow.querySelector('.speaker-btn');
-
   botText.innerHTML = '<span style="color:#a855f7;">Titan is thinking...</span>';
 
   try {
@@ -248,7 +223,7 @@ async function handleSend(isLive = false) {
             const data = JSON.parse(line.replace('data: ', ''));
             if (data.text) {
               accumulated += data.text;
-              botText.innerHTML = parseMarkdown(accumulated);
+              botText.innerHTML = marked.parse(accumulated);
               chatViewport.scrollTop = chatViewport.scrollHeight;
             }
           } catch {}
@@ -260,17 +235,14 @@ async function handleSend(isLive = false) {
     localStorage.setItem('titan_ai_sessions', JSON.stringify(chats));
     renderHomeHistory();
 
-    if (spkBtn) {
-      spkBtn.onclick = () => window.speakText(spkBtn, accumulated);
-    }
-
+    if (spkBtn) spkBtn.onclick = () => window.speakText(accumulated);
     if (isLive || isLiveModeActive) {
-      voiceTranscriptText.innerHTML = parseMarkdown(accumulated);
-      window.speakText(spkBtn, accumulated, true);
+      voiceTranscriptText.innerHTML = marked.parse(accumulated);
+      window.speakText(accumulated, true);
     }
 
-  } catch {
-    botText.innerHTML = '<span style="color:#ef4444;">⚠️ Connection failed.</span>';
+  } catch (e) {
+    botText.innerHTML = '<span style="color:#ef4444;">⚠️ Connection failed. Please check network.</span>';
   }
 }
 
@@ -281,11 +253,6 @@ userInput.addEventListener('keydown', (e) => {
     if (!sendBtn.disabled) handleSend(false);
   }
 });
-
-function parseMarkdown(text) {
-  if (typeof marked !== 'undefined') return marked.parse(text);
-  return text.replace(/\n/g, '<br>');
-}
 
 function appendUserBubble(text) {
   const row = document.createElement('div');
@@ -318,20 +285,16 @@ function escapeHtml(text) {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-// Voice Mode
+// 5. SPEECH RECOGNITION & SYNTHESIS
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recognition = null;
 let isListening = false;
 
 if (SpeechRecognition) {
   recognition = new SpeechRecognition();
+  recognition.lang = 'en-IN';
   recognition.continuous = false;
   recognition.interimResults = false;
-  recognition.lang = 'en-IN';
-
-  recognition.onspeechstart = () => {
-    if (window.speechSynthesis.speaking) window.speechSynthesis.cancel();
-  };
 
   recognition.onstart = () => {
     isListening = true;
@@ -353,91 +316,50 @@ if (SpeechRecognition) {
   recognition.onend = () => {
     isListening = false;
     micBtn.classList.remove('listening');
-    if (isLiveModeActive && !window.speechSynthesis.speaking) {
-      setTimeout(() => {
-        if (isLiveModeActive) {
-          try { recognition.start(); } catch (e) {}
-        }
-      }, 400);
-    }
   };
 }
 
 function startLiveVoiceSession() {
   isLiveModeActive = true;
   showScreen(voiceScreen);
-  if (window.speechSynthesis.speaking) window.speechSynthesis.cancel();
-  try { recognition.start(); } catch (e) {}
+  if (window.speechSynthesis) window.speechSynthesis.cancel();
+  try { recognition && recognition.start(); } catch (e) {}
 }
 
 voiceCloseScreenBtn.addEventListener('click', () => {
   isLiveModeActive = false;
   if (recognition) recognition.stop();
-  if (window.speechSynthesis.speaking) window.speechSynthesis.cancel();
+  if (window.speechSynthesis) window.speechSynthesis.cancel();
   showScreen(homeScreen);
 });
 
 voiceBackBtn.addEventListener('click', () => voiceCloseScreenBtn.click());
-
-voiceMainMicBtn.addEventListener('click', async () => {
-  await requestDevicePermissions();
+voiceMainMicBtn.addEventListener('click', () => {
   if (isListening) recognition.stop();
   else recognition.start();
 });
 
-micBtn.addEventListener('click', async () => {
-  await requestDevicePermissions();
-  if (!recognition) return;
+micBtn.addEventListener('click', () => {
+  if (!recognition) return alert("Speech recognition not supported on this browser.");
   if (isListening) recognition.stop();
   else recognition.start();
 });
 
-window.speakText = function(btn, text, isLive = false) {
+window.speakText = function(text, isLive = false) {
   if (!window.speechSynthesis) return;
-
-  if (window.speechSynthesis.speaking) {
-    window.speechSynthesis.cancel();
-    return;
-  }
-
-  const cleanText = text.replace(/```[\s\S]*?```/g, '').replace(/[*#`_~]/g, '').trim();
-  const utterance = new SpeechSynthesisUtterance(cleanText);
-  utterance.rate = 1.05;
-
+  window.speechSynthesis.cancel();
+  const clean = text.replace(/```[\s\S]*?```/g, '').replace(/[*#`_~]/g, '').trim();
+  const utterance = new SpeechSynthesisUtterance(clean);
   utterance.onend = () => {
     if (isLiveModeActive && recognition) {
       voiceTranscriptText.innerText = "Listening again...";
       try { recognition.start(); } catch (e) {}
     }
   };
-
   window.speechSynthesis.speak(utterance);
 };
 
-// Attachments & History
-attachBtn.addEventListener('click', () => filePicker.click());
-
-filePicker.addEventListener('change', (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-
-  const reader = new FileReader();
-  reader.onload = () => {
-    attachedFile = { type: 'doc', name: file.name, content: reader.result.slice(0, 12000) };
-    fileName.innerText = file.name;
-    attachmentBar.style.display = 'block';
-    sendBtn.disabled = false;
-  };
-  reader.readAsText(file);
-});
-
-removeFileBtn.addEventListener('click', () => {
-  attachedFile = null;
-  filePicker.value = '';
-  attachmentBar.style.display = 'none';
-  sendBtn.disabled = !userInput.value.trim();
-});
-
+// 6. SESSIONS & HISTORY
 function renderHomeHistory() {
   homeRecentHistoryList.innerHTML = '';
   const keys = Object.keys(chats).reverse().slice(0, 4);
@@ -465,13 +387,17 @@ function loadSession(id) {
   const list = chats[id]?.messages || [];
   list.forEach(m => {
     if (m.role === 'user') {
-      appendUserBubble(typeof m.content === 'string' ? m.content : 'Input');
+      appendUserBubble(typeof m.content === 'string' ? m.content : 'User Input');
     } else {
       const bRow = appendBotBubble();
       const bText = bRow.querySelector('.bot-text');
       const spk = bRow.querySelector('.speaker-btn');
-      bText.innerHTML = parseMarkdown(m.content);
-      spk.onclick = () => window.speakText(spk, m.content);
+      bText.innerHTML = marked.parse(m.content);
+      spk.onclick = () => window.speakText(m.content);
     }
   });
 }
+
+window.onload = function() {
+  renderHomeHistory();
+};
