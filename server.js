@@ -6,11 +6,11 @@ const { OpenAI } = require('openai');
 const app = express();
 const port = process.env.PORT || 3000;
 
-app.use(express.json({ limit: '40mb' }));
-app.use(express.urlencoded({ limit: '40mb', extended: true }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(express.static(__dirname));
 
-// PWA routes
+// Direct PWA Routes
 app.get('/manifest.json', (req, res) => {
   res.setHeader('Content-Type', 'application/manifest+json');
   res.sendFile(path.join(__dirname, 'manifest.json'));
@@ -22,9 +22,10 @@ app.get('/sw.js', (req, res) => {
   res.sendFile(path.join(__dirname, 'sw.js'));
 });
 
-const rawKey = process.env.OPENROUTER_API_KEY || process.env.API_KEY || process.env.GROQ_API_KEY || '';
+// Auto-Detect Groq / OpenRouter API Key
+const rawKey = process.env.GROQ_API_KEY || process.env.API_KEY || process.env.OPENROUTER_API_KEY || '';
 const apiKey = rawKey.trim();
-const isGroq = apiKey.startsWith('gsk_');
+const isGroq = apiKey.startsWith('gsk_') || Boolean(process.env.GROQ_API_KEY);
 
 const openai = new OpenAI({
   apiKey: apiKey || 'dummy-key',
@@ -35,83 +36,42 @@ const openai = new OpenAI({
   }
 });
 
+// Ultra-Fast Groq Production Models
 const GROQ_MODELS = [
   'llama-3.3-70b-versatile',
   'llama-3.1-8b-instant'
 ];
 
-let dynamicOpenRouterFreeModels = [
+const OPENROUTER_MODELS = [
   'google/gemini-2.0-flash-exp:free',
   'meta-llama/llama-3.3-70b-instruct:free',
-  'meta-llama/llama-3.2-11b-vision-instruct:free',
-  'meta-llama/llama-3.2-3b-instruct:free',
-  'deepseek/deepseek-r1:free'
+  'meta-llama/llama-3.2-3b-instruct:free'
 ];
 
-async function refreshFreeModels() {
-  if (isGroq || !apiKey || apiKey === 'dummy-key') return;
-  try {
-    const response = await fetch('https://openrouter.ai/api/v1/models', {
-      headers: { 'Authorization': `Bearer ${apiKey}` }
-    });
-    if (response.ok) {
-      const data = await response.json();
-      if (Array.isArray(data.data)) {
-        const liveFree = data.data
-          .map(m => m.id)
-          .filter(id => id && id.endsWith(':free'));
-        if (liveFree.length > 0) {
-          dynamicOpenRouterFreeModels = liveFree;
-        }
-      }
-    }
-  } catch (err) {
-    console.warn('[OpenRouter] Model discovery warning:', err.message);
-  }
-}
-
-refreshFreeModels();
+const targetModels = isGroq ? GROQ_MODELS : OPENROUTER_MODELS;
 
 app.post('/api/chat', async (req, res) => {
-  const { messages, language = 'en-IN' } = req.body;
+  const { messages } = req.body;
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
 
   if (!apiKey || apiKey === 'dummy-key') {
-    res.write(`data: ${JSON.stringify({ text: '⚠️ API Key is missing in Render dashboard.' })}\n\n`);
+    res.write(`data: ${JSON.stringify({ text: '⚠️ API Key is missing! Set GROQ_API_KEY in Render Environment Variables.' })}\n\n`);
     res.write('data: [DONE]\n\n');
     return res.end();
   }
 
-  const langMap = {
-    'ta-IN': 'Tamil (தமிழ்). Reply strictly in clear, natural Tamil script.',
-    'hi-IN': 'Hindi (हिन्दी). Reply strictly in standard conversational Hindi Devanagari script.',
-    'te-IN': 'Telugu (తెలుగు). Reply strictly in clear Telugu script.',
-    'kn-IN': 'Kannada (ಕನ್ನಡ). Reply strictly in clear Kannada script.',
-    'ml-IN': 'Malayalam (മലയാളം). Reply strictly in clear Malayalam script.',
-    'en-IN': 'Indian English. Reply concisely and naturally.'
-  };
-
-  const selectedLangInstruction = langMap[language] || langMap['en-IN'];
-
   const systemPrompt = {
     role: 'system',
-    content: `You are Titan AI, an ultra-intelligent, multimodal live voice & vision assistant modeled after Gemini Live. 
-Primary Language: ${selectedLangInstruction}
-Guidelines:
-1. Keep spoken live responses brief, conversational, and direct (1-3 sentences) unless asked for details.
-2. If an image/camera frame is provided, describe what you observe directly in the requested language.`
+    content: 'You are Titan AI, an intelligent, fast multimodal assistant. Provide accurate, clean, structured markdown responses.'
   };
 
   const payload = [systemPrompt, ...messages.filter(m => m.role !== 'system')];
-  const candidateModels = isGroq ? GROQ_MODELS : dynamicOpenRouterFreeModels;
-
   let lastError = '';
-  let streamSucceeded = false;
 
-  for (const model of candidateModels) {
+  for (const model of targetModels) {
     try {
       const stream = await openai.chat.completions.create({
         model: model,
@@ -126,20 +86,17 @@ Guidelines:
         }
       }
 
-      streamSucceeded = true;
       res.write('data: [DONE]\n\n');
       return res.end();
     } catch (err) {
-      lastError = err.message || 'Model error';
-      console.warn(`[Titan AI] Model ${model} failed, fallback triggered...`);
+      lastError = err.message || 'Model execution error';
+      console.warn(`[Titan AI] Model ${model} failed, switching to fallback...`);
     }
   }
 
-  if (!streamSucceeded) {
-    res.write(`data: ${JSON.stringify({ text: `\n\n⚠️ AI Error: ${lastError}` })}\n\n`);
-    res.write('data: [DONE]\n\n');
-    res.end();
-  }
+  res.write(`data: ${JSON.stringify({ text: `\n\n⚠️ AI Error: ${lastError}` })}\n\n`);
+  res.write('data: [DONE]\n\n');
+  res.end();
 });
 
 app.get('*', (req, res) => {
@@ -147,5 +104,5 @@ app.get('*', (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`Titan AI Server active on port ${port}`);
+  console.log(`Titan AI Server active on port ${port} | Engine: ${isGroq ? 'Groq Ultra-Fast' : 'OpenRouter'}`);
 });

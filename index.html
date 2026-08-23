@@ -7,15 +7,16 @@
   <title>Titan AI</title>
 
   <link rel="manifest" href="/manifest.json">
-  <meta name="theme-color" content="#7c3aed">
+  <meta name="theme-color" content="#ffffff">
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
 
   <link rel="stylesheet" href="style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 
+  <!-- Document Parsers & Markdown Renderer -->
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
@@ -23,192 +24,130 @@
 </head>
 <body class="notranslate">
 
-  <div class="mobile-container">
+  <div class="gemini-app-shell">
     
-    <!-- SCREEN 0: GOOGLE LOGIN GATE -->
-    <section class="app-screen active" id="authScreen">
-      <div class="auth-card-wrapper">
-        <div class="massive-iridescent-orb" style="width: 130px; height: 130px;"></div>
-        <h2 class="auth-title">Titan AI</h2>
-        <p class="auth-subtitle">Real-Time Continuous Voice, Vision & Multilingual AI.</p>
+    <!-- SCREEN 0: MANDATORY GOOGLE AUTH GATE -->
+    <section class="screen-view active" id="authScreen">
+      <div class="auth-box">
+        <div class="gemini-sparkle-logo">✦</div>
+        <h2 class="auth-heading">Titan AI</h2>
+        <p class="auth-sub">Next-Generation Voice, Vision & Document Intelligence</p>
         
-        <div class="google-auth-box">
+        <div class="auth-actions">
           <div id="googleLandingBtn"></div>
-          <button class="guest-btn" id="guestBtn">Continue as Guest</button>
+          <button class="guest-action-btn" id="guestBtn">Continue as Guest</button>
         </div>
       </div>
     </section>
 
-    <!-- SCREEN 1: HOME DASHBOARD -->
-    <section class="app-screen" id="homeScreen">
-      <div class="screen-header">
-        <div class="user-greeting">
-          <div class="avatar-ring">
-            <img id="homeUserAvatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=Titan" alt="Avatar" class="header-avatar">
-          </div>
-          <div>
-            <span class="greeting-subtitle" id="greetingSub">Hi there,</span>
-            <h4 class="greeting-name" id="homeUserName">Titan User</h4>
-          </div>
+    <!-- SCREEN 1: MAIN GEMINI CANVAS & CONVERSATION -->
+    <section class="screen-view" id="mainScreen">
+      <!-- Minimalist Top Navigation -->
+      <header class="gemini-top-nav">
+        <button class="nav-icon-btn" id="newChatBtn" title="New Chat">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+          </svg>
+        </button>
+
+        <div class="user-avatar-badge" id="profileToggleBtn" title="Account / Logout">
+          <span id="userInitialBadge">U</span>
+          <img id="userProfileImg" src="" alt="Profile" style="display: none;">
         </div>
-        
-        <div class="header-action-group">
-          <select id="globalLangSelector" class="lang-dropdown-pill">
-            <option value="en-IN">🇬🇧 English</option>
-            <option value="ta-IN">🇮🇳 தமிழ் (Tamil)</option>
-            <option value="hi-IN">🇮🇳 हिन्दी (Hindi)</option>
-            <option value="te-IN">🇮🇳 తెలుగు (Telugu)</option>
-            <option value="kn-IN">🇮🇳 ಕನ್ನಡ (Kannada)</option>
-            <option value="ml-IN">🇮🇳 മലയാളം (Malayalam)</option>
-          </select>
-          <button class="icon-circle-btn" id="logoutBtn" title="Switch User">⚙️</button>
+      </header>
+
+      <!-- Center Landing Canvas (Centered Greeting) -->
+      <div class="gemini-center-canvas" id="centerGreetingCanvas">
+        <h1 class="gemini-gradient-greeting" id="greetingText">
+          Hello, <span class="gradient-name" id="userGreetingName">there</span>
+        </h1>
+      </div>
+
+      <!-- Active Chat Scroll Viewport -->
+      <div class="chat-messages-container" id="chatViewport" style="display: none;"></div>
+
+      <!-- Floating Attachment Preview Bar -->
+      <div class="attachment-float-bar" id="attachmentBar" style="display: none;">
+        <div class="attachment-tag">
+          <span id="fileIcon">📄</span>
+          <span id="fileName">document.pdf</span>
+          <span id="fileStatus" class="tag-status">Ready</span>
+          <button id="removeFileBtn" class="tag-close-btn">✕</button>
         </div>
       </div>
 
-      <!-- Center 3D Iridescent Orb -->
-      <div class="hero-orb-wrapper">
-        <div class="iridescent-orb-sm" id="homeOrbTrigger" title="Tap to start Gemini Live"></div>
-        <p class="hero-subtext">Tap orb for live multimodal voice and camera conversation.</p>
-      </div>
-
-      <!-- 2x2 Glass Bento Cards -->
-      <div class="glass-bento-grid">
-        <div class="glass-bento-card" id="cardLiveGemini">
-          <div class="bento-icon-title">✨ Gemini Live</div>
-          <p>Continuous real-time voice with Indian language support.</p>
-        </div>
-
-        <div class="glass-bento-card" id="cardChatAI">
-          <div class="bento-icon-title">💬 Smart Chat</div>
-          <p>Analyze PDF, DOCX, Code & Instant Chat.</p>
-        </div>
-
-        <div class="glass-bento-card" id="cardLiveVision">
-          <div class="bento-icon-title">📷 Live Vision</div>
-          <p>Real-time visual camera feed conversation.</p>
-        </div>
-
-        <div class="glass-bento-card" id="cardDeepReason">
-          <div class="bento-icon-title">⚡ Deep Reasoning</div>
-          <p>Step-by-step logic, code, and document summary.</p>
-        </div>
-      </div>
-
-      <!-- Search Capsule -->
-      <div class="bottom-search-capsule" id="homeSearchTrigger">
-        <input type="text" placeholder="Ask anything or talk in Indian languages..." readonly>
-        <button class="sparkle-send-btn">✦</button>
-      </div>
-    </section>
-
-    <!-- SCREEN 2: SMART CHAT -->
-    <section class="app-screen" id="chatScreen">
-      <div class="screen-header">
-        <button class="back-circle-btn" id="chatBackBtn">←</button>
-        <h3 class="greeting-name">Smart Chat</h3>
-        <button class="icon-circle-btn" id="newChatTopBtn">↺</button>
-      </div>
-
-      <div class="chat-viewport" id="chatViewport"></div>
-
-      <div class="chat-bottom-deck">
-        <div class="action-pill-carousel">
-          <button class="deck-pill" id="deckLiveBtn">✨ Gemini Live</button>
-          <button class="deck-pill" id="deckUploadDocBtn">📄 Upload PDF / DOCX</button>
-          <button class="deck-pill" id="deckReasonBtn">💡 Deep Reasoning</button>
-        </div>
-
-        <div class="attachment-bar" id="attachmentBar" style="display: none;">
-          <div class="attachment-badge">
-            <span id="fileIcon">📄</span>
-            <span id="fileName">document.pdf</span>
-            <span id="fileStatusBadge" class="file-status">Ready</span>
-            <button id="removeFileBtn" class="remove-btn">✕</button>
-          </div>
-        </div>
-
-        <div class="input-core-row">
+      <!-- Bottom Gemini Floating Input Capsule -->
+      <div class="gemini-bottom-dock">
+        <div class="gemini-input-capsule">
           <input type="file" id="filePicker" accept=".pdf,.doc,.docx,.txt,.js,.py,.html,.css,.json,.csv,image/*" hidden>
-          <button class="tool-btn" id="attachBtn" title="Upload Attachment">📎</button>
-          <textarea id="userInput" placeholder="Type a message..." rows="1"></textarea>
-          <button class="mic-action-btn" id="micBtn" title="Speech Input">🎙️</button>
-          <button class="send-action-btn" id="sendBtn" disabled title="Send">➤</button>
+          <button class="capsule-icon-btn" id="attachBtn" title="Upload Document / PDF">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+          </button>
+          
+          <input type="text" id="userInput" placeholder="Ask Titan..." autocomplete="off">
+
+          <div class="capsule-tools-cluster">
+            <button class="capsule-icon-btn" id="micBtn" title="Voice Input">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                <line x1="12" y1="19" x2="12" y2="23"></line>
+                <line x1="8" y1="23" x2="16" y2="23"></line>
+              </svg>
+            </button>
+
+            <button class="capsule-icon-btn" id="camSnapBtn" title="Camera Vision">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                <circle cx="12" cy="13" r="4"></circle>
+              </svg>
+            </button>
+          </div>
         </div>
+
+        <!-- Standalone Gemini Live Sparkle Button -->
+        <button class="gemini-live-sparkle-btn" id="geminiLiveBtn" title="Launch Gemini Live">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+          </svg>
+        </button>
       </div>
     </section>
 
-    <!-- SCREEN 3: REDESIGNED GEMINI LIVE SCREEN -->
-    <section class="app-screen" id="liveScreen">
-      <!-- Live Top Controls -->
-      <div class="live-top-bar">
-        <button class="live-nav-btn" id="liveBackBtn">✕</button>
-        
-        <div class="live-lang-capsule">
-          <span class="lang-icon">🌐</span>
-          <select id="liveLangSelector" class="live-lang-dropdown">
-            <option value="en-IN">English (India)</option>
-            <option value="ta-IN">தமிழ் (Tamil)</option>
-            <option value="hi-IN">हिन्दी (Hindi)</option>
-            <option value="te-IN">తెలుగు (Telugu)</option>
-            <option value="kn-IN">ಕನ್ನಡ (Kannada)</option>
-            <option value="ml-IN">മലയാളം (Malayalam)</option>
-          </select>
+    <!-- SCREEN 2: GEMINI LIVE (FULLSCREEN VOICE + REAL-TIME CAMERA STREAM) -->
+    <section class="screen-view" id="liveScreen">
+      <video id="liveCamVideo" class="live-cam-stream" autoplay playsinline muted style="display: none;"></video>
+      <canvas id="liveCamCanvas" style="display: none;"></canvas>
+
+      <div class="live-overlay-container">
+        <header class="live-header-bar">
+          <button class="live-pill-btn" id="liveBackBtn">← Exit</button>
+          <div class="live-status-pill">
+            <span class="live-indicator-dot"></span>
+            <span id="liveStatusText">Live Listening</span>
+          </div>
+          <button class="live-pill-btn" id="liveCamToggleBtn">📷 Camera</button>
+        </header>
+
+        <div class="live-orb-stage">
+          <div class="live-gemini-orb" id="liveOrb"></div>
+          <div class="live-transcript-bubble">
+            <p id="liveTranscriptText">"Listening to you... Speak naturally"</p>
+          </div>
         </div>
 
-        <button class="live-nav-btn" id="liveToggleCamBtn" title="Toggle Camera">
-          <span id="camIconText">📷</span>
-        </button>
-      </div>
-
-      <!-- Live Interactive Stage: Orb & Picture-in-Picture Camera -->
-      <div class="live-multimodal-stage">
-        <!-- PIP Floating Video View -->
-        <div class="live-camera-pip-card" id="cameraPipCard" style="display: none;">
-          <video id="liveCamVideo" autoplay playsinline muted></video>
-          <div class="pip-live-badge">● LIVE VISION</div>
-        </div>
-        <canvas id="liveCamCanvas" style="display: none;"></canvas>
-
-        <!-- 3D Glowing Voice Orb with Wave Ring -->
-        <div class="live-orb-wrapper" id="liveOrbContainer">
-          <div class="orb-pulse-aura" id="orbPulseAura"></div>
-          <div class="massive-iridescent-orb" id="liveOrbElement"></div>
-        </div>
-
-        <div class="live-status-indicator">
-          <span class="live-pulse-dot" id="livePulseDot"></span>
-          <span id="liveStatusText">Listening to you...</span>
-        </div>
-      </div>
-
-      <!-- Dedicated Real-Time Live Conversation Log Feed -->
-      <div class="live-transcript-feed" id="liveTranscriptFeed">
-        <div class="live-feed-bubble bot">
-          <span class="bubble-tag">✦ Titan Live</span>
-          <p id="liveBotCurrentSpeech">Ready! Tap microphone or speak naturally.</p>
-        </div>
-      </div>
-
-      <!-- Interactive Control Dock -->
-      <div class="live-bottom-dock">
-        <button class="live-action-btn" id="liveMuteBtn" title="Mute/Unmute">
-          <span id="muteIcon">🎙️</span>
-          <span class="btn-label">Mic</span>
-        </button>
-
-        <button class="live-action-btn interrupt-btn" id="liveInterruptBtn" title="Interrupt AI Speaking">
-          <span>⚡</span>
-          <span class="btn-label">Stop AI</span>
-        </button>
-
-        <button class="live-action-btn" id="livePauseBtn" title="Pause/Resume">
-          <span id="pauseIcon">⏸️</span>
-          <span class="btn-label">Pause</span>
-        </button>
-
-        <button class="live-end-call-btn" id="liveEndBtn" title="End Live Mode">
-          <span>📞</span>
-        </button>
+        <footer class="live-bottom-dock">
+          <button class="live-action-circle" id="liveMuteBtn" title="Mute/Unmute Mic">
+            <span id="muteIcon">🎙️</span>
+          </button>
+          <button class="live-action-circle" id="livePauseBtn" title="Pause/Resume">
+            <span id="pauseIcon">⏸️</span>
+          </button>
+          <button class="live-action-circle interrupt-btn" id="liveInterruptBtn" title="Stop AI Speaking">
+            ⚡ Stop AI
+          </button>
+          <button class="live-end-btn" id="liveEndBtn">End Live</button>
+        </footer>
       </div>
     </section>
 
