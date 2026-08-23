@@ -20,13 +20,43 @@ const openai = new OpenAI({
   }
 });
 
-// Active OpenRouter Free & Multimodal Models
-const OPENROUTER_MODELS = [
-  'google/gemini-2.0-flash-exp:free',
-  'meta-llama/llama-3.3-70b-instruct:free',
-  'meta-llama/llama-3.1-8b-instruct:free',
-  'mistralai/mistral-7b-instruct:free'
-];
+let cachedFreeModels = [];
+let lastFetchTime = 0;
+
+// Dynamic Discovery: OpenRouter-la live-a active-a irukra free models-a dynamic-a fetch seiyyum
+async function getLiveActiveFreeModels() {
+  const now = Date.now();
+  if (cachedFreeModels.length > 0 && now - lastFetchTime < 10 * 60 * 1000) {
+    return cachedFreeModels;
+  }
+
+  try {
+    const res = await fetch('https://openrouter.ai/api/v1/models');
+    const data = await res.json();
+
+    if (data && Array.isArray(data.data)) {
+      const freeModels = data.data
+        .filter(m => m.id && (m.id.endsWith(':free') || (m.pricing?.prompt === '0' && m.pricing?.completion === '0')))
+        .map(m => m.id);
+
+      if (freeModels.length > 0) {
+        cachedFreeModels = freeModels;
+        lastFetchTime = now;
+        console.log(`[Auto-Discovery] Fetched ${freeModels.length} active free models:`, freeModels.slice(0, 4));
+        return cachedFreeModels;
+      }
+    }
+  } catch (err) {
+    console.warn('[Discovery Warning] Live fetch failed, using fallback:', err.message);
+  }
+
+  return [
+    'openrouter/free',
+    'meta-llama/llama-3.3-70b-instruct:free',
+    'meta-llama/llama-3.1-8b-instruct:free',
+    'qwen/qwen-2.5-coder-32b-instruct:free'
+  ];
+}
 
 app.post('/api/chat', async (req, res) => {
   const { messages, image } = req.body;
@@ -39,17 +69,18 @@ app.post('/api/chat', async (req, res) => {
   });
 
   if (!apiKey) {
-    res.write(`data: ${JSON.stringify({ text: '⚠️ OpenRouter API Key missing! Set API_KEY in Render Environment.' })}\n\n`);
+    res.write(`data: ${JSON.stringify({ text: '⚠️ API Key is missing! Set API_KEY in Render Environment.' })}\n\n`);
     res.write('data: [DONE]\n\n');
     return res.end();
   }
 
+  const activeModels = await getLiveActiveFreeModels();
+
   const systemPrompt = {
     role: 'system',
-    content: 'You are Titan AI, an ultra-fast multimodal AI assistant with live voice and vision capabilities. When an image is provided, concisely explain what you see in direct plain text without conversational filler. Keep answers brief unless detail is asked.'
+    content: 'You are Titan AI, an ultra-fast multimodal AI assistant with live voice and vision capabilities. When an image or camera frame is provided, concisely explain what you see in direct plain text without conversational filler. Keep answers brief and rapid.'
   };
 
-  // Build Payload with Text / Camera Image
   let formattedMessages = [systemPrompt];
 
   if (Array.isArray(messages)) {
@@ -57,7 +88,6 @@ app.post('/api/chat', async (req, res) => {
       const m = messages[i];
       if (m.role === 'system') continue;
 
-      // Attach vision payload to the latest user message if camera frame exists
       if (i === messages.length - 1 && image && typeof image === 'string' && image.startsWith('data:image')) {
         formattedMessages.push({
           role: 'user',
@@ -77,7 +107,7 @@ app.post('/api/chat', async (req, res) => {
 
   let lastError = '';
 
-  for (const model of OPENROUTER_MODELS) {
+  for (const model of activeModels) {
     try {
       const stream = await openai.chat.completions.create({
         model: model,
@@ -99,7 +129,7 @@ app.post('/api/chat', async (req, res) => {
       return res.end();
     } catch (err) {
       lastError = err.message || 'Model failed';
-      console.warn(`[OpenRouter] Model ${model} failed, switching to backup:`, lastError);
+      console.warn(`[Auto-Router] Model ${model} failed, switching to next active model...`);
     }
   }
 
@@ -109,5 +139,5 @@ app.post('/api/chat', async (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`Titan AI running on port ${port} powered by OpenRouter`);
+  console.log(`Titan AI running on port ${port} with Live Discovery Router`);
 });
