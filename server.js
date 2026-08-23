@@ -9,31 +9,58 @@ app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ limit: '20mb', extended: true }));
 app.use(express.static(__dirname));
 
-const apiKey = (process.env.API_KEY || process.env.GROQ_API_KEY || process.env.OPENROUTER_API_KEY || '').trim();
-
-// Auto-detect Groq vs OpenRouter
-const isGroq = apiKey.startsWith('gsk_');
+const apiKey = (process.env.API_KEY || process.env.OPENROUTER_API_KEY || '').trim();
 
 const openai = new OpenAI({
   apiKey: apiKey,
-  baseURL: isGroq ? 'https://api.groq.com/openai/v1' : 'https://openrouter.ai/api/v1',
-  defaultHeaders: isGroq ? {} : {
+  baseURL: 'https://openrouter.ai/api/v1',
+  defaultHeaders: {
     'HTTP-Referer': 'https://titan-ai-bwzi.onrender.com',
     'X-Title': 'Titan AI',
   }
 });
 
-// 100% Active Production Models
-const ACTIVE_MODELS = isGroq
-  ? [
-      'llama-3.3-70b-versatile',
-      'llama-3.1-8b-instant'
-    ]
-  : [
-      'meta-llama/llama-3.3-70b-instruct:free',
-      'meta-llama/llama-3.1-8b-instruct:free',
-      'mistralai/mistral-7b-instruct:free'
-    ];
+// Dynamic Cache for Free Models
+let cachedFreeModels = [];
+let lastFetchTime = 0;
+
+// Auto-search & fetch currently active 100% free models from OpenRouter
+async function fetchLiveFreeModels() {
+  const now = Date.now();
+  // Cache for 15 minutes to avoid redundant API calls
+  if (cachedFreeModels.length > 0 && now - lastFetchTime < 15 * 60 * 1000) {
+    return cachedFreeModels;
+  }
+
+  try {
+    const res = await fetch('https://openrouter.ai/api/v1/models');
+    const data = await res.json();
+    
+    if (data && Array.isArray(data.data)) {
+      // Filter models ending with ':free' or having 0 cost pricing
+      const freeModels = data.data
+        .filter(m => m.id.endsWith(':free') || (m.pricing?.prompt === '0' && m.pricing?.completion === '0'))
+        .map(m => m.id);
+
+      if (freeModels.length > 0) {
+        cachedFreeModels = freeModels;
+        lastFetchTime = now;
+        console.log(`[OpenRouter Discovery] Found ${freeModels.length} active free models:`, freeModels.slice(0, 5));
+        return cachedFreeModels;
+      }
+    }
+  } catch (err) {
+    console.warn('[Discovery Warning] Failed to fetch live models list:', err.message);
+  }
+
+  // Robust Hardcoded Fallback if discovery endpoint fails
+  return [
+    'openrouter/free',
+    'meta-llama/llama-3.1-8b-instruct:free',
+    'meta-llama/llama-3.3-70b-instruct:free',
+    'mistralai/mistral-7b-instruct:free'
+  ];
+}
 
 app.post('/api/chat', async (req, res) => {
   const { messages } = req.body;
@@ -48,15 +75,18 @@ app.post('/api/chat', async (req, res) => {
     return res.end();
   }
 
+  // Get real-time dynamically fetched free models
+  const availableModels = await fetchLiveFreeModels();
+
   const systemPrompt = {
     role: 'system',
-    content: 'You are Titan AI, an intelligent, helpful, and concise AI assistant. Respond directly in clear English or the user-requested language. Do not output Arabic.'
+    content: 'You are Titan AI, an intelligent, helpful AI assistant. Always respond directly and concisely in clear English or user-requested language (Tamil/Hindi).'
   };
 
   const payload = [systemPrompt, ...messages.filter(m => m.role !== 'system')];
   let lastError = '';
 
-  for (const model of ACTIVE_MODELS) {
+  for (const model of availableModels) {
     try {
       const stream = await openai.chat.completions.create({
         model: model,
@@ -75,7 +105,7 @@ app.post('/api/chat', async (req, res) => {
       return res.end();
     } catch (err) {
       lastError = err.message || 'Model unavailable';
-      console.warn(`Model ${model} failed, switching to backup...`);
+      console.warn(`[Auto-Router] ${model} failed, auto-trying next active free model...`);
     }
   }
 
@@ -85,5 +115,5 @@ app.post('/api/chat', async (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
+  console.log(`Server running on port ${port} with Auto-Discovery Engine`);
 });
