@@ -23,7 +23,7 @@ const openai = new OpenAI({
 let cachedFreeModels = [];
 let lastFetchTime = 0;
 
-// Dynamic Discovery: OpenRouter-la live-a active-a irukra free models-a dynamic-a fetch seiyyum
+// Dynamic Free Model Discovery Router
 async function getLiveActiveFreeModels() {
   const now = Date.now();
   if (cachedFreeModels.length > 0 && now - lastFetchTime < 10 * 60 * 1000) {
@@ -69,7 +69,7 @@ app.post('/api/chat', async (req, res) => {
   });
 
   if (!apiKey) {
-    res.write(`data: ${JSON.stringify({ text: '⚠️ API Key is missing! Set API_KEY in Render Environment.' })}\n\n`);
+    res.write(`data: ${JSON.stringify({ text: '⚠️ API Key is missing in Render Environment!' })}\n\n`);
     res.write('data: [DONE]\n\n');
     return res.end();
   }
@@ -78,7 +78,7 @@ app.post('/api/chat', async (req, res) => {
 
   const systemPrompt = {
     role: 'system',
-    content: 'You are Titan AI, an ultra-fast multimodal AI assistant with live voice and vision capabilities. When an image or camera frame is provided, concisely explain what you see in direct plain text without conversational filler. Keep answers brief and rapid.'
+    content: 'You are Titan AI, an ultra-fast multimodal AI assistant with live voice, document analysis, and vision capabilities. When an image, document, or camera frame is provided, concisely answer user queries in direct plain text without conversational filler. Keep answers brief and rapid.'
   };
 
   let formattedMessages = [systemPrompt];
@@ -92,7 +92,7 @@ app.post('/api/chat', async (req, res) => {
         formattedMessages.push({
           role: 'user',
           content: [
-            { type: 'text', text: typeof m.content === 'string' ? m.content : 'Describe what is in this live camera frame.' },
+            { type: 'text', text: typeof m.content === 'string' ? m.content : 'Describe what is in this live camera frame or uploaded image.' },
             { type: 'image_url', image_url: { url: image } }
           ]
         });
@@ -113,7 +113,7 @@ app.post('/api/chat', async (req, res) => {
         model: model,
         messages: formattedMessages,
         stream: true,
-        max_tokens: 500,
+        max_tokens: 600,
         temperature: 0.5
       });
 

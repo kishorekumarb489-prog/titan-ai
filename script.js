@@ -1,5 +1,10 @@
 const GOOGLE_CLIENT_ID = "1027901085880-ltncq1or8f5lupuvnd7g1ea8uq4ierf9.apps.googleusercontent.com";
 
+// Setup PDF.js worker
+if (window.pdfjsLib) {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+
 // Modal & Profiles
 const welcomeLoginModal = document.getElementById('welcomeLoginModal');
 const homeUserName = document.getElementById('homeUserName');
@@ -50,11 +55,19 @@ const orbContainer = document.getElementById('orbContainer');
 const cameraStream = document.getElementById('cameraStream');
 const cameraCanvas = document.getElementById('cameraCanvas');
 
+// File Upload Elements
+const attachBtn = document.getElementById('attachBtn');
+const filePicker = document.getElementById('filePicker');
+const attachmentBar = document.getElementById('attachmentBar');
+const fileName = document.getElementById('fileName');
+const removeFileBtn = document.getElementById('removeFileBtn');
+
+let attachedFile = null;
 let isSending = false;
 let isLiveModeActive = false;
 let isMicMuted = false;
 let isSessionPaused = false;
-let isAiSpeaking = false; // Prevents premature listening loop
+let isAiSpeaking = false;
 let isCameraActive = false;
 let cameraMediaStream = null;
 let userSpeakingTimeout = null;
@@ -164,10 +177,96 @@ deckCodeBtn.addEventListener('click', () => {
 userInput.addEventListener('input', () => {
   userInput.style.height = 'auto';
   userInput.style.height = Math.min(userInput.scrollHeight, 100) + 'px';
+  sendBtn.disabled = !userInput.value.trim() && !attachedFile;
+});
+
+// ==========================================
+// UNIVERSAL DOCUMENT & IMAGE READER
+// ==========================================
+attachBtn.addEventListener('click', () => filePicker.click());
+
+filePicker.addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const ext = file.name.split('.').pop().toLowerCase();
+  fileName.innerText = `Loading ${file.name}...`;
+  attachmentBar.style.display = 'block';
+
+  try {
+    // 1. PDF Parsing
+    if (ext === 'pdf') {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      let fullText = '';
+      for (let i = 1; i <= Math.min(pdf.numPages, 10); i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        fullText += textContent.items.map(item => item.str).join(' ') + '\n';
+      }
+      attachedFile = {
+        type: 'doc',
+        name: file.name,
+        content: `[Attached PDF Document: ${file.name}]\n${fullText.slice(0, 15000)}`
+      };
+      fileName.innerText = `📄 ${file.name}`;
+      sendBtn.disabled = false;
+    }
+    // 2. Word (.docx) Parsing
+    else if (ext === 'docx') {
+      const arrayBuffer = await file.arrayBuffer();
+      const result = await mammoth.extractRawText({ arrayBuffer: arrayBuffer });
+      attachedFile = {
+        type: 'doc',
+        name: file.name,
+        content: `[Attached Word Document: ${file.name}]\n${result.value.slice(0, 15000)}`
+      };
+      fileName.innerText = `📝 ${file.name}`;
+      sendBtn.disabled = false;
+    }
+    // 3. Images (JPEG, PNG, WEBP)
+    else if (['jpg', 'jpeg', 'png', 'webp'].includes(ext)) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        attachedFile = {
+          type: 'image',
+          name: file.name,
+          dataUrl: reader.result
+        };
+        fileName.innerText = `🖼️ ${file.name}`;
+        sendBtn.disabled = false;
+      };
+      reader.readAsDataURL(file);
+    }
+    // 4. Code / Text (.txt, .py, .js, .csv, .c, .cpp, .html, .json, .md)
+    else {
+      const reader = new FileReader();
+      reader.onload = () => {
+        attachedFile = {
+          type: 'doc',
+          name: file.name,
+          content: `[Attached File: ${file.name}]\n\`\`\`\n${reader.result.slice(0, 15000)}\n\`\`\``
+        };
+        fileName.innerText = `📁 ${file.name}`;
+        sendBtn.disabled = false;
+      };
+      reader.readAsText(file);
+    }
+  } catch (err) {
+    fileName.innerText = `⚠️ Error reading ${file.name}`;
+  }
+});
+
+removeFileBtn?.addEventListener('click', () => {
+  attachedFile = null;
+  filePicker.value = '';
+  attachmentBar.style.display = 'none';
   sendBtn.disabled = !userInput.value.trim();
 });
 
-// Camera Vision Handlers
+// ==========================================
+// CAMERA STREAM HANDLER
+// ==========================================
 cameraToggleBtn.addEventListener('click', async () => {
   if (isCameraActive) {
     stopCameraStream();
@@ -211,14 +310,15 @@ function captureCurrentCameraFrame() {
 }
 
 // ==========================================
-// FAST SEND & REAL-TIME SPEECH SYNTHESIS
+// DISPATCH ENGINE (NO DOUBLE-SENDS)
 // ==========================================
 async function handleSend(isLive = false) {
   const text = userInput.value.trim();
-  if (!text || isSending) return;
+  if (!text && !attachedFile) return;
+  if (isSending) return;
 
   isSending = true;
-  isAiSpeaking = true; // Lock speech recognition during answer
+  isAiSpeaking = true;
   sendBtn.disabled = true;
 
   if (recognition) {
@@ -230,16 +330,28 @@ async function handleSend(isLive = false) {
   }
 
   if (!chats[currentChatId]) {
-    chats[currentChatId] = { title: text.slice(0, 24) || 'Session', messages: [] };
+    chats[currentChatId] = { title: text.slice(0, 24) || attachedFile?.name || 'Session', messages: [] };
   }
 
-  const cameraFrame = isLive && isCameraActive ? captureCurrentCameraFrame() : null;
+  let fullPrompt = text;
+  let attachedImageData = null;
 
-  appendUserBubble(text);
-  chats[currentChatId].messages.push({ role: 'user', content: text });
+  if (attachedFile) {
+    if (attachedFile.type === 'doc') {
+      fullPrompt = `${attachedFile.content}\n\nUser Question: ${text || 'Please summarize or explain this document.'}`;
+    } else if (attachedFile.type === 'image') {
+      attachedImageData = attachedFile.dataUrl;
+    }
+  }
+
+  const cameraFrame = isLive && isCameraActive ? captureCurrentCameraFrame() : attachedImageData;
+
+  appendUserBubble(text || `Uploaded: ${attachedFile?.name}`);
+  chats[currentChatId].messages.push({ role: 'user', content: fullPrompt });
 
   userInput.value = '';
   userInput.style.height = 'auto';
+  if (removeFileBtn) removeFileBtn.click();
 
   const botRow = appendBotBubble();
   const botText = botRow.querySelector('.bot-text');
@@ -274,7 +386,6 @@ async function handleSend(isLive = false) {
               botText.innerHTML = parseMarkdown(accumulated);
               chatViewport.scrollTop = chatViewport.scrollHeight;
 
-              // Trigger speech as soon as first 40 characters or sentence end is reached
               if ((isLive || isLiveModeActive) && !hasStartedSpeaking && (/[.?!,]|\n/.test(accumulated) || accumulated.length > 40)) {
                 hasStartedSpeaking = true;
                 voiceTranscriptText.innerHTML = parseMarkdown(accumulated);
@@ -306,7 +417,7 @@ async function handleSend(isLive = false) {
     }
   } finally {
     isSending = false;
-    sendBtn.disabled = !userInput.value.trim();
+    sendBtn.disabled = !userInput.value.trim() && !attachedFile;
   }
 }
 
@@ -357,7 +468,7 @@ function escapeHtml(text) {
 }
 
 // ==========================================
-// HIGH-ACCURACY LIVE VOICE ENGINE (ZERO-DELAY)
+// ZERO-DELAY VOICE ENGINE
 // ==========================================
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recognition = null;
@@ -396,7 +507,6 @@ if (SpeechRecognition) {
         voiceTranscriptText.innerHTML = `"${detectedText}"`;
       }
 
-      // Snappy 500ms silence detection
       clearTimeout(userSpeakingTimeout);
       userSpeakingTimeout = setTimeout(async () => {
         if (detectedText.length > 2 && !isSending) {
@@ -430,7 +540,6 @@ function restartRecognitionSafe() {
   }
 }
 
-// Live Controls
 voiceMuteBtn.addEventListener('click', () => {
   isMicMuted = !isMicMuted;
   if (isMicMuted) {
@@ -504,7 +613,6 @@ micBtn.addEventListener('click', () => {
   else try { recognition.start(); } catch (e) {}
 });
 
-// Fast Voice Output
 window.speakText = function(text, isLive = false) {
   if (!window.speechSynthesis) return;
   window.speechSynthesis.cancel();
@@ -517,7 +625,7 @@ window.speakText = function(text, isLive = false) {
     .trim();
 
   const utterance = new SpeechSynthesisUtterance(cleanText);
-  utterance.rate = 1.2; // Accelerated natural pace
+  utterance.rate = 1.2;
   utterance.pitch = 1.05;
 
   utterance.onend = () => {
