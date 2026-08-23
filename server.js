@@ -1,6 +1,6 @@
 require('dotenv').config();
 const express = require('express');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { OpenAI } = require('openai');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -9,10 +9,24 @@ app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ limit: '25mb', extended: true }));
 app.use(express.static(__dirname));
 
-const rawKey = (process.env.GEMINI_API_KEY || process.env.API_KEY || '').trim();
-const genAI = new GoogleGenerativeAI(rawKey);
+const apiKey = (process.env.API_KEY || process.env.OPENROUTER_API_KEY || '').trim();
 
-const FAST_VISION_MODELS = ['gemini-1.5-flash', 'gemini-1.5-flash-latest'];
+const openai = new OpenAI({
+  apiKey: apiKey,
+  baseURL: 'https://openrouter.ai/api/v1',
+  defaultHeaders: {
+    'HTTP-Referer': 'https://titan-ai-bwzi.onrender.com',
+    'X-Title': 'Titan AI',
+  }
+});
+
+// Active OpenRouter Free & Multimodal Models
+const OPENROUTER_MODELS = [
+  'google/gemini-2.0-flash-exp:free',
+  'meta-llama/llama-3.3-70b-instruct:free',
+  'meta-llama/llama-3.1-8b-instruct:free',
+  'mistralai/mistral-7b-instruct:free'
+];
 
 app.post('/api/chat', async (req, res) => {
   const { messages, image } = req.body;
@@ -24,47 +38,59 @@ app.post('/api/chat', async (req, res) => {
     'X-Accel-Buffering': 'no'
   });
 
-  if (!rawKey) {
-    res.write(`data: ${JSON.stringify({ text: '⚠️ API Key is missing! Set GEMINI_API_KEY in Render.' })}\n\n`);
+  if (!apiKey) {
+    res.write(`data: ${JSON.stringify({ text: '⚠️ OpenRouter API Key missing! Set API_KEY in Render Environment.' })}\n\n`);
     res.write('data: [DONE]\n\n');
     return res.end();
   }
 
-  const systemInstruction = 'You are Titan AI, an ultra-fast multimodal AI assistant with live voice and vision capabilities. When an image or camera frame is provided, concisely explain what you see in direct plain text without conversational filler. Keep answers brief and rapid.';
+  const systemPrompt = {
+    role: 'system',
+    content: 'You are Titan AI, an ultra-fast multimodal AI assistant with live voice and vision capabilities. When an image is provided, concisely explain what you see in direct plain text without conversational filler. Keep answers brief unless detail is asked.'
+  };
 
-  for (const modelName of FAST_VISION_MODELS) {
-    try {
-      const model = genAI.getGenerativeModel({
-        model: modelName,
-        systemInstruction: systemInstruction,
-        generationConfig: {
-          maxOutputTokens: 500,
-          temperature: 0.4
-        }
-      });
+  // Build Payload with Text / Camera Image
+  let formattedMessages = [systemPrompt];
 
-      let promptParts = [];
+  if (Array.isArray(messages)) {
+    for (let i = 0; i < messages.length; i++) {
+      const m = messages[i];
+      if (m.role === 'system') continue;
 
-      if (image && image.startsWith('data:image')) {
-        const base64Data = image.split(',')[1];
-        promptParts.push({
-          inlineData: {
-            data: base64Data,
-            mimeType: 'image/jpeg'
-          }
+      // Attach vision payload to the latest user message if camera frame exists
+      if (i === messages.length - 1 && image && typeof image === 'string' && image.startsWith('data:image')) {
+        formattedMessages.push({
+          role: 'user',
+          content: [
+            { type: 'text', text: typeof m.content === 'string' ? m.content : 'Describe what is in this live camera frame.' },
+            { type: 'image_url', image_url: { url: image } }
+          ]
+        });
+      } else {
+        formattedMessages.push({
+          role: m.role || 'user',
+          content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content)
         });
       }
+    }
+  }
 
-      const lastUserMsg = messages[messages.length - 1];
-      const userText = typeof lastUserMsg.content === 'string' ? lastUserMsg.content : 'Analyze this visual scene.';
-      promptParts.push({ text: userText });
+  let lastError = '';
 
-      const result = await model.generateContentStream(promptParts);
+  for (const model of OPENROUTER_MODELS) {
+    try {
+      const stream = await openai.chat.completions.create({
+        model: model,
+        messages: formattedMessages,
+        stream: true,
+        max_tokens: 500,
+        temperature: 0.5
+      });
 
-      for await (const chunk of result.stream) {
-        const text = chunk.text();
-        if (text) {
-          res.write(`data: ${JSON.stringify({ text })}\n\n`);
+      for await (const chunk of stream) {
+        const content = chunk.choices[0]?.delta?.content || '';
+        if (content) {
+          res.write(`data: ${JSON.stringify({ text: content })}\n\n`);
           if (res.flush) res.flush();
         }
       }
@@ -72,15 +98,16 @@ app.post('/api/chat', async (req, res) => {
       res.write('data: [DONE]\n\n');
       return res.end();
     } catch (err) {
-      console.warn(`Model ${modelName} fallback...`, err.message);
+      lastError = err.message || 'Model failed';
+      console.warn(`[OpenRouter] Model ${model} failed, switching to backup:`, lastError);
     }
   }
 
-  res.write(`data: ${JSON.stringify({ text: '⚠️ Processing error. Please retry.' })}\n\n`);
+  res.write(`data: ${JSON.stringify({ text: `⚠️ OpenRouter Error: ${lastError}` })}\n\n`);
   res.write('data: [DONE]\n\n');
   res.end();
 });
 
 app.listen(port, () => {
-  console.log(`Titan AI Fast Multi-modal server running on port ${port}`);
+  console.log(`Titan AI running on port ${port} powered by OpenRouter`);
 });
