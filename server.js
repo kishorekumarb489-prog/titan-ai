@@ -37,10 +37,8 @@ const openai = new OpenAI({
   }
 });
 
-// Dynamic Model List Storage
-let activeModels = isGroqKey ? ['llama-3.3-70b-versatile'] : ['meta-llama/llama-3.3-70b-instruct:free'];
+let activeModels = isGroqKey ? ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'] : ['meta-llama/llama-3.3-70b-instruct:free'];
 
-// Dynamically fetch live available models from Groq/OpenRouter
 async function fetchActiveModels() {
   if (!apiKey || apiKey === 'dummy-key') return;
   try {
@@ -51,11 +49,9 @@ async function fetchActiveModels() {
       const data = await res.json();
       const models = (data.data || []).map(m => m.id);
       if (models.length > 0) {
-        // Filter out non-chat models
         const chatModels = models.filter(id => !id.includes('whisper') && !id.includes('embed') && !id.includes('guard'));
         if (chatModels.length > 0) {
           activeModels = chatModels;
-          console.log(`[Titan AI] Auto-discovered ${chatModels.length} active models from API.`);
         }
       }
     }
@@ -63,8 +59,6 @@ async function fetchActiveModels() {
     console.warn('[Titan AI] Model auto-fetch warning:', err.message);
   }
 }
-
-// Fetch models immediately on boot
 fetchActiveModels();
 
 app.post('/api/chat', async (req, res) => {
@@ -80,9 +74,10 @@ app.post('/api/chat', async (req, res) => {
     return res.end();
   }
 
+  // System Prompt for concise, direct, short answers
   const systemPrompt = {
     role: 'system',
-    content: 'You are Titan AI, an advanced, high-speed assistant. Format responses cleanly using Markdown.'
+    content: 'You are Titan AI, a fast and highly efficient assistant. Give direct, concise, and straight-to-the-point answers. Avoid long background intros, redundant analysis, or lengthy summaries unless explicitly asked. Use short bullet points or 1-2 crisp paragraphs.'
   };
 
   const sanitizedMessages = (messages || []).map(m => {
@@ -100,7 +95,6 @@ app.post('/api/chat', async (req, res) => {
   let lastError = '';
   let streamSuccess = false;
 
-  // Prioritize larger/versatile models first
   const sortedModels = [...activeModels].sort((a, b) => {
     if (a.includes('70b') || a.includes('versatile')) return -1;
     if (b.includes('70b') || b.includes('versatile')) return 1;
@@ -112,6 +106,8 @@ app.post('/api/chat', async (req, res) => {
       const stream = await openai.chat.completions.create({
         model: model,
         messages: payload,
+        max_tokens: 600,
+        temperature: 0.5,
         stream: true,
       });
 
@@ -127,11 +123,10 @@ app.post('/api/chat', async (req, res) => {
       return res.end();
     } catch (err) {
       lastError = err.message || 'Execution error';
-      console.warn(`[Titan AI] Model ${model} failed (${lastError}), trying next fallback...`);
+      console.warn(`[Titan AI] Model ${model} failed (${lastError}), switching...`);
     }
   }
 
-  // If failed, re-fetch models once and retry top 2
   if (!streamSuccess) {
     await fetchActiveModels();
     for (const model of activeModels.slice(0, 2)) {
@@ -139,6 +134,8 @@ app.post('/api/chat', async (req, res) => {
         const stream = await openai.chat.completions.create({
           model: model,
           messages: payload,
+          max_tokens: 600,
+          temperature: 0.5,
           stream: true,
         });
         for await (const chunk of stream) {
@@ -153,7 +150,7 @@ app.post('/api/chat', async (req, res) => {
     }
   }
 
-  res.write(`data: { "text": "\n\n⚠️ AI Error: ${lastError}" }\n\n`);
+  res.write(`data: ${JSON.stringify({ text: `\n\n⚠️ AI Error: ${lastError}` })}\n\n`);
   res.write('data: [DONE]\n\n');
   res.end();
 });
@@ -163,5 +160,5 @@ app.get('*', (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`Titan AI online on port ${port} | Auto-Discovery Engine Active`);
+  console.log(`Titan AI online on port ${port} | Concise Mode Active`);
 });
