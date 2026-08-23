@@ -1,137 +1,65 @@
-const GOOGLE_CLIENT_ID = "1027901085880-ltncq1or8f5lupuvnd7g1ea8uq4ierf9.apps.googleusercontent.com";
-
-// Setup PDF.js worker
-if (window.pdfjsLib) {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+// ==========================================
+// 0. PWA SERVICE WORKER REGISTRATION
+// ==========================================
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then(() => console.log('Titan AI Service Worker Registered!'))
+      .catch((err) => console.log('SW registration failed:', err));
+  });
 }
 
-// Modal & Profiles
-const welcomeLoginModal = document.getElementById('welcomeLoginModal');
-const homeUserName = document.getElementById('homeUserName');
-const homeUserAvatar = document.getElementById('homeUserAvatar');
-const logoutBtn = document.getElementById('logoutBtn');
+const GOOGLE_CLIENT_ID = "1027901085880-ltncq1or8f5lupuvnd7g1ea8uq4ierf9.apps.googleusercontent.com";
 
 // Screen Views
 const homeScreen = document.getElementById('homeScreen');
 const chatScreen = document.getElementById('chatScreen');
 const voiceScreen = document.getElementById('voiceScreen');
 
-// Navigation Triggers
+// Home Screen Elements
+const homeUserName = document.getElementById('homeUserName');
+const homeUserAvatar = document.getElementById('homeUserAvatar');
 const homeSearchTrigger = document.getElementById('homeSearchTrigger');
 const cardNewChat = document.getElementById('cardNewChat');
 const cardDeepResearch = document.getElementById('cardDeepResearch');
 const cardVoiceLive = document.getElementById('cardVoiceLive');
 const cardLiveWeather = document.getElementById('cardLiveWeather');
 const homeRecentHistoryList = document.getElementById('homeRecentHistoryList');
-const clearAllHistoryBtn = document.getElementById('clearAllHistoryBtn');
 
-const chatBackBtn = document.getElementById('chatBackBtn');
-const newChatTopBtn = document.getElementById('newChatTopBtn');
+// Chat Screen Elements
 const chatViewport = document.getElementById('chatViewport');
 const userInput = document.getElementById('userInput');
 const sendBtn = document.getElementById('sendBtn');
 const micBtn = document.getElementById('micBtn');
-
+const chatBackBtn = document.getElementById('chatBackBtn');
+const newChatTopBtn = document.getElementById('newChatTopBtn');
 const deckVoiceModeBtn = document.getElementById('deckVoiceModeBtn');
 const deckReasoningBtn = document.getElementById('deckReasoningBtn');
 const deckCodeBtn = document.getElementById('deckCodeBtn');
-
-// Voice & Vision Elements
-const voiceBackBtn = document.getElementById('voiceBackBtn');
-const voiceCloseScreenBtn = document.getElementById('voiceCloseScreenBtn');
-const voiceMainMicBtn = document.getElementById('voiceMainMicBtn');
-const voiceTranscriptText = document.getElementById('voiceTranscriptText');
-const voiceMuteBtn = document.getElementById('voiceMuteBtn');
-const voicePauseBtn = document.getElementById('voicePauseBtn');
-const micOnIcon = document.getElementById('micOnIcon');
-const micOffIcon = document.getElementById('micOffIcon');
-const pauseIcon = document.getElementById('pauseIcon');
-const playIcon = document.getElementById('playIcon');
-
-// Camera Elements
-const cameraToggleBtn = document.getElementById('cameraToggleBtn');
-const cameraContainer = document.getElementById('cameraContainer');
-const orbContainer = document.getElementById('orbContainer');
-const cameraStream = document.getElementById('cameraStream');
-const cameraCanvas = document.getElementById('cameraCanvas');
-
-// File Upload Elements
 const attachBtn = document.getElementById('attachBtn');
 const filePicker = document.getElementById('filePicker');
 const attachmentBar = document.getElementById('attachmentBar');
 const fileName = document.getElementById('fileName');
 const removeFileBtn = document.getElementById('removeFileBtn');
 
+// Voice Screen Elements
+const voiceBackBtn = document.getElementById('voiceBackBtn');
+const voiceCloseScreenBtn = document.getElementById('voiceCloseScreenBtn');
+const voiceMainMicBtn = document.getElementById('voiceMainMicBtn');
+const voiceTranscriptText = document.getElementById('voiceTranscriptText');
+
 let attachedFile = null;
-let isSending = false;
 let isLiveModeActive = false;
-let isMicMuted = false;
-let isSessionPaused = false;
-let isAiSpeaking = false;
-let isCameraActive = false;
-let cameraMediaStream = null;
-let userSpeakingTimeout = null;
 let currentChatId = Date.now().toString();
 let chats = JSON.parse(localStorage.getItem('titan_ai_sessions') || '{}');
 
+// Screen Router
 function showScreen(screen) {
   [homeScreen, chatScreen, voiceScreen].forEach(s => s.classList.remove('active'));
   screen.classList.add('active');
 }
 
-function enforceAuthentication() {
-  const savedUser = localStorage.getItem('titan_user_profile');
-  if (!savedUser) {
-    welcomeLoginModal.style.display = 'flex';
-  } else {
-    welcomeLoginModal.style.display = 'none';
-    const user = JSON.parse(savedUser);
-    homeUserName.innerText = user.name || 'Titan Explorer';
-    if (user.picture) homeUserAvatar.src = user.picture;
-  }
-}
-
-function parseJwt(token) {
-  try {
-    const base64Url = token.split('.')[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    return JSON.parse(window.atob(base64));
-  } catch {
-    return null;
-  }
-}
-
-window.handleCredentialResponse = function(response) {
-  const user = parseJwt(response.credential);
-  if (user) {
-    const profile = { name: user.name, picture: user.picture, email: user.email };
-    localStorage.setItem('titan_user_profile', JSON.stringify(profile));
-    enforceAuthentication();
-  }
-};
-
-logoutBtn.addEventListener('click', () => {
-  localStorage.removeItem('titan_user_profile');
-  if (window.google?.accounts?.id) google.accounts.id.disableAutoSelect();
-  enforceAuthentication();
-});
-
-window.onload = function() {
-  enforceAuthentication();
-  if (window.google?.accounts?.id) {
-    google.accounts.id.initialize({
-      client_id: GOOGLE_CLIENT_ID,
-      callback: handleCredentialResponse,
-      auto_select: false
-    });
-    google.accounts.id.renderButton(
-      document.getElementById('googleModalBtnContainer'),
-      { theme: 'outline', size: 'large', shape: 'pill', text: 'continue_with' }
-    );
-  }
-  renderHomeHistory();
-};
-
+// Home Triggers
 homeSearchTrigger.addEventListener('click', () => {
   showScreen(chatScreen);
   userInput.focus();
@@ -146,16 +74,17 @@ cardNewChat.addEventListener('click', () => {
 
 cardDeepResearch.addEventListener('click', () => {
   showScreen(chatScreen);
-  userInput.value = "Conduct a step-by-step deep reasoning for: ";
+  userInput.value = "Conduct a deep analytical research on: ";
   userInput.focus();
-  sendBtn.disabled = false;
 });
 
-cardVoiceLive.addEventListener('click', () => startLiveVoiceSession());
+cardVoiceLive.addEventListener('click', () => {
+  startLiveVoiceSession();
+});
 
 cardLiveWeather.addEventListener('click', async () => {
   showScreen(chatScreen);
-  userInput.value = "What is the live weather forecast in my area?";
+  userInput.value = "What is the live weather status for my current location?";
   await handleSend();
 });
 
@@ -166,14 +95,13 @@ deckVoiceModeBtn.addEventListener('click', () => startLiveVoiceSession());
 deckReasoningBtn.addEventListener('click', () => {
   userInput.value = "Think step-by-step with deep reasoning: " + userInput.value;
   userInput.focus();
-  sendBtn.disabled = false;
 });
 deckCodeBtn.addEventListener('click', () => {
-  userInput.value = "Write clean, fully-commented code for: " + userInput.value;
+  userInput.value = "Write clean, optimized code for: " + userInput.value;
   userInput.focus();
-  sendBtn.disabled = false;
 });
 
+// Auto Resize Input
 userInput.addEventListener('input', () => {
   userInput.style.height = 'auto';
   userInput.style.height = Math.min(userInput.scrollHeight, 100) + 'px';
@@ -181,173 +109,109 @@ userInput.addEventListener('input', () => {
 });
 
 // ==========================================
-// UNIVERSAL DOCUMENT & IMAGE READER
+// 1. GOOGLE IDENTITY SIGN-IN
 // ==========================================
-attachBtn.addEventListener('click', () => filePicker.click());
-
-filePicker.addEventListener('change', async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-
-  const ext = file.name.split('.').pop().toLowerCase();
-  fileName.innerText = `Loading ${file.name}...`;
-  attachmentBar.style.display = 'block';
-
+function parseJwt(token) {
   try {
-    // 1. PDF Parsing
-    if (ext === 'pdf') {
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-      let fullText = '';
-      for (let i = 1; i <= Math.min(pdf.numPages, 10); i++) {
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-        fullText += textContent.items.map(item => item.str).join(' ') + '\n';
-      }
-      attachedFile = {
-        type: 'doc',
-        name: file.name,
-        content: `[Attached PDF Document: ${file.name}]\n${fullText.slice(0, 15000)}`
-      };
-      fileName.innerText = `📄 ${file.name}`;
-      sendBtn.disabled = false;
-    }
-    // 2. Word (.docx) Parsing
-    else if (ext === 'docx') {
-      const arrayBuffer = await file.arrayBuffer();
-      const result = await mammoth.extractRawText({ arrayBuffer: arrayBuffer });
-      attachedFile = {
-        type: 'doc',
-        name: file.name,
-        content: `[Attached Word Document: ${file.name}]\n${result.value.slice(0, 15000)}`
-      };
-      fileName.innerText = `📝 ${file.name}`;
-      sendBtn.disabled = false;
-    }
-    // 3. Images (JPEG, PNG, WEBP)
-    else if (['jpg', 'jpeg', 'png', 'webp'].includes(ext)) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        attachedFile = {
-          type: 'image',
-          name: file.name,
-          dataUrl: reader.result
-        };
-        fileName.innerText = `🖼️ ${file.name}`;
-        sendBtn.disabled = false;
-      };
-      reader.readAsDataURL(file);
-    }
-    // 4. Code / Text (.txt, .py, .js, .csv, .c, .cpp, .html, .json, .md)
-    else {
-      const reader = new FileReader();
-      reader.onload = () => {
-        attachedFile = {
-          type: 'doc',
-          name: file.name,
-          content: `[Attached File: ${file.name}]\n\`\`\`\n${reader.result.slice(0, 15000)}\n\`\`\``
-        };
-        fileName.innerText = `📁 ${file.name}`;
-        sendBtn.disabled = false;
-      };
-      reader.readAsText(file);
-    }
-  } catch (err) {
-    fileName.innerText = `⚠️ Error reading ${file.name}`;
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(window.atob(base64));
+  } catch {
+    return null;
   }
-});
-
-removeFileBtn?.addEventListener('click', () => {
-  attachedFile = null;
-  filePicker.value = '';
-  attachmentBar.style.display = 'none';
-  sendBtn.disabled = !userInput.value.trim();
-});
-
-// ==========================================
-// CAMERA STREAM HANDLER
-// ==========================================
-cameraToggleBtn.addEventListener('click', async () => {
-  if (isCameraActive) {
-    stopCameraStream();
-  } else {
-    try {
-      cameraMediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } }
-      });
-      cameraStream.srcObject = cameraMediaStream;
-      isCameraActive = true;
-      cameraToggleBtn.classList.add('active');
-      cameraToggleBtn.innerText = '📷 Stop Cam';
-      cameraContainer.style.display = 'block';
-      orbContainer.style.display = 'none';
-      voiceTranscriptText.innerText = "Camera active! Speak to analyze view.";
-    } catch (err) {
-      alert("Camera permission is needed for live vision mode.");
-    }
-  }
-});
-
-function stopCameraStream() {
-  if (cameraMediaStream) {
-    cameraMediaStream.getTracks().forEach(track => track.stop());
-    cameraMediaStream = null;
-  }
-  isCameraActive = false;
-  cameraToggleBtn.classList.remove('active');
-  cameraToggleBtn.innerText = '📷 Camera';
-  cameraContainer.style.display = 'none';
-  orbContainer.style.display = 'block';
 }
 
-function captureCurrentCameraFrame() {
-  if (!isCameraActive || !cameraStream.videoWidth) return null;
-  cameraCanvas.width = cameraStream.videoWidth;
-  cameraCanvas.height = cameraStream.videoHeight;
-  const ctx = cameraCanvas.getContext('2d');
-  ctx.drawImage(cameraStream, 0, 0, cameraCanvas.width, cameraCanvas.height);
-  return cameraCanvas.toDataURL('image/jpeg', 0.6);
+window.handleCredentialResponse = function(response) {
+  const user = parseJwt(response.credential);
+  if (user) {
+    const profile = { name: user.name, picture: user.picture };
+    localStorage.setItem('titan_user_profile', JSON.stringify(profile));
+    loadUserProfile();
+  }
+};
+
+function loadUserProfile() {
+  const savedUser = localStorage.getItem('titan_user_profile');
+  if (savedUser) {
+    const user = JSON.parse(savedUser);
+    homeUserName.innerText = user.name || 'User';
+    if (user.picture) homeUserAvatar.src = user.picture;
+  }
+}
+
+window.onload = function() {
+  loadUserProfile();
+  if (window.google?.accounts?.id) {
+    google.accounts.id.initialize({
+      client_id: GOOGLE_CLIENT_ID,
+      callback: handleCredentialResponse,
+    });
+    google.accounts.id.renderButton(
+      document.getElementById('googleBtnContainer'),
+      { theme: 'outline', size: 'small', shape: 'pill' }
+    );
+  }
+  renderHomeHistory();
+};
+
+// ==========================================
+// 2. LIVE WEATHER & SENSORS
+// ==========================================
+async function getLiveWeatherContext() {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) return resolve('');
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const lat = pos.coords.latitude;
+          const lon = pos.coords.longitude;
+          const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`);
+          const data = await res.json();
+          const cw = data.current_weather;
+          resolve(`[User Location: Lat ${lat.toFixed(2)}, Lon ${lon.toFixed(2)} | Temp: ${cw.temperature}°C, Wind: ${cw.windspeed}km/h | Time: ${new Date().toLocaleTimeString()}]`);
+        } catch {
+          resolve('');
+        }
+      },
+      () => resolve(''),
+      { timeout: 4000 }
+    );
+  });
 }
 
 // ==========================================
-// DISPATCH ENGINE (NO DOUBLE-SENDS)
+// 3. GROQ STREAMING & DISPATCH
 // ==========================================
 async function handleSend(isLive = false) {
   const text = userInput.value.trim();
   if (!text && !attachedFile) return;
-  if (isSending) return;
 
-  isSending = true;
-  isAiSpeaking = true;
-  sendBtn.disabled = true;
-
-  if (recognition) {
-    try { recognition.stop(); } catch (e) {}
-  }
-
-  if (isLive || isLiveModeActive) {
-    voiceTranscriptText.innerText = "Thinking...";
-  }
+  if (isListening && recognition) recognition.stop();
 
   if (!chats[currentChatId]) {
-    chats[currentChatId] = { title: text.slice(0, 24) || attachedFile?.name || 'Session', messages: [] };
+    chats[currentChatId] = { title: text.slice(0, 24) || 'AI Session', messages: [] };
   }
 
+  const weatherContext = await getLiveWeatherContext();
   let fullPrompt = text;
-  let attachedImageData = null;
-
-  if (attachedFile) {
-    if (attachedFile.type === 'doc') {
-      fullPrompt = `${attachedFile.content}\n\nUser Question: ${text || 'Please summarize or explain this document.'}`;
-    } else if (attachedFile.type === 'image') {
-      attachedImageData = attachedFile.dataUrl;
-    }
+  if (weatherContext && !chats[currentChatId].hasSentWeather) {
+    fullPrompt = `${weatherContext}\n${text}`;
+    chats[currentChatId].hasSentWeather = true;
   }
 
-  const cameraFrame = isLive && isCameraActive ? captureCurrentCameraFrame() : attachedImageData;
+  let payload;
+  if (attachedFile?.type === 'doc') {
+    payload = {
+      role: 'user',
+      content: `[File: ${attachedFile.name}]\n\`\`\`\n${attachedFile.content}\n\`\`\`\n${fullPrompt}`
+    };
+  } else {
+    payload = { role: 'user', content: fullPrompt };
+  }
 
-  appendUserBubble(text || `Uploaded: ${attachedFile?.name}`);
-  chats[currentChatId].messages.push({ role: 'user', content: fullPrompt });
+  appendUserBubble(text || `Attached: ${attachedFile?.name}`);
+  chats[currentChatId].messages.push(payload);
 
   userInput.value = '';
   userInput.style.height = 'auto';
@@ -355,28 +219,26 @@ async function handleSend(isLive = false) {
 
   const botRow = appendBotBubble();
   const botText = botRow.querySelector('.bot-text');
-  const spkBtn = botRow.querySelector('.speaker-action-btn');
+  const spkBtn = botRow.querySelector('.speaker-btn');
+
+  botText.innerHTML = '<span style="color:#a855f7;">Titan is thinking...</span>';
 
   try {
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        messages: chats[currentChatId].messages,
-        image: cameraFrame
-      })
+      body: JSON.stringify({ messages: chats[currentChatId].messages })
     });
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let accumulated = '';
-    let hasStartedSpeaking = false;
 
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
 
-      const lines = decoder.decode(value, { stream: true }).split('\n');
+      const lines = decoder.decode(value).split('\n');
       for (const line of lines) {
         if (line.startsWith('data: ') && line !== 'data: [DONE]') {
           try {
@@ -385,12 +247,6 @@ async function handleSend(isLive = false) {
               accumulated += data.text;
               botText.innerHTML = parseMarkdown(accumulated);
               chatViewport.scrollTop = chatViewport.scrollHeight;
-
-              if ((isLive || isLiveModeActive) && !hasStartedSpeaking && (/[.?!,]|\n/.test(accumulated) || accumulated.length > 40)) {
-                hasStartedSpeaking = true;
-                voiceTranscriptText.innerHTML = parseMarkdown(accumulated);
-                window.speakText(accumulated, true);
-              }
             }
           } catch {}
         }
@@ -401,31 +257,21 @@ async function handleSend(isLive = false) {
     localStorage.setItem('titan_ai_sessions', JSON.stringify(chats));
     renderHomeHistory();
 
-    if (spkBtn) spkBtn.onclick = () => window.speakText(accumulated);
+    if (spkBtn) {
+      spkBtn.onclick = () => window.speakText(spkBtn, accumulated);
+    }
 
-    if ((isLive || isLiveModeActive) && !hasStartedSpeaking) {
+    if (isLive || isLiveModeActive) {
       voiceTranscriptText.innerHTML = parseMarkdown(accumulated);
-      window.speakText(accumulated, true);
+      window.speakText(spkBtn, accumulated, true);
     }
 
   } catch {
     botText.innerHTML = '<span style="color:#ef4444;">⚠️ Connection failed.</span>';
-    if (isLive || isLiveModeActive) {
-      voiceTranscriptText.innerText = "Error connecting. Try speaking again.";
-      isAiSpeaking = false;
-      restartRecognitionSafe();
-    }
-  } finally {
-    isSending = false;
-    sendBtn.disabled = !userInput.value.trim() && !attachedFile;
   }
 }
 
-sendBtn.addEventListener('click', (e) => {
-  e.preventDefault();
-  handleSend(false);
-});
-
+sendBtn.addEventListener('click', () => handleSend(false));
 userInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault();
@@ -434,7 +280,9 @@ userInput.addEventListener('keydown', (e) => {
 });
 
 function parseMarkdown(text) {
-  if (typeof marked !== 'undefined') return marked.parse(text);
+  if (typeof marked !== 'undefined') {
+    return marked.parse(text);
+  }
   return text.replace(/\n/g, '<br>');
 }
 
@@ -451,10 +299,12 @@ function appendBotBubble() {
   row.className = 'chat-bubble-row bot';
   row.innerHTML = `
     <div class="bot-bubble-wrapper">
-      <div class="bot-avatar-badge">⚡</div>
+      <div class="bot-avatar-badge">✦</div>
       <div class="bot-bubble-box">
         <div class="bot-text">...</div>
-        <button class="speaker-action-btn">🔊 Read</button>
+        <div class="bot-msg-actions">
+          <button class="action-mini-icon speaker-btn">🔊 Read</button>
+        </div>
       </div>
     </div>
   `;
@@ -468,7 +318,7 @@ function escapeHtml(text) {
 }
 
 // ==========================================
-// ZERO-DELAY VOICE ENGINE
+// 4. HOLOGRAPHIC ORB GEMINI LIVE VOICE
 // ==========================================
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recognition = null;
@@ -476,116 +326,46 @@ let isListening = false;
 
 if (SpeechRecognition) {
   recognition = new SpeechRecognition();
-  recognition.continuous = true;
-  recognition.interimResults = true;
+  recognition.continuous = false;
+  recognition.interimResults = false;
   recognition.lang = 'en-IN';
+
+  recognition.onspeechstart = () => {
+    if (window.speechSynthesis.speaking) window.speechSynthesis.cancel();
+  };
 
   recognition.onstart = () => {
     isListening = true;
     micBtn.classList.add('listening');
-    if (isLiveModeActive && !isMicMuted && !isSessionPaused && !isAiSpeaking) {
-      voiceTranscriptText.innerText = "Listening to you...";
-    }
+    if (isLiveModeActive) voiceTranscriptText.innerText = "Listening to you...";
   };
 
   recognition.onresult = async (event) => {
-    if (isMicMuted || isSessionPaused || isAiSpeaking) return;
-
-    let interimTranscript = '';
-    let finalTranscript = '';
-
-    for (let i = event.resultIndex; i < event.results.length; ++i) {
-      const trans = event.results[i][0].transcript;
-      if (event.results[i].isFinal) finalTranscript += trans;
-      else interimTranscript += trans;
-    }
-
-    const detectedText = (finalTranscript || interimTranscript).trim();
-
-    if (detectedText.length > 2) {
+    const transcript = event.results[0][0].transcript;
+    if (transcript.trim()) {
+      userInput.value = transcript;
       if (isLiveModeActive) {
-        voiceTranscriptText.innerHTML = `"${detectedText}"`;
+        voiceTranscriptText.innerHTML = `"${transcript}"`;
+        await handleSend(true);
       }
-
-      clearTimeout(userSpeakingTimeout);
-      userSpeakingTimeout = setTimeout(async () => {
-        if (detectedText.length > 2 && !isSending) {
-          userInput.value = detectedText;
-          try { recognition.stop(); } catch (e) {}
-          await handleSend(isLiveModeActive);
-        }
-      }, 550);
     }
-  };
-
-  recognition.onerror = () => {
-    isListening = false;
-    micBtn.classList.remove('listening');
   };
 
   recognition.onend = () => {
     isListening = false;
     micBtn.classList.remove('listening');
-    restartRecognitionSafe();
+    if (isLiveModeActive && !window.speechSynthesis.speaking) {
+      setTimeout(() => {
+        if (isLiveModeActive) {
+          try { recognition.start(); } catch (e) {}
+        }
+      }, 400);
+    }
   };
 }
 
-function restartRecognitionSafe() {
-  if (isLiveModeActive && !isAiSpeaking && !isMicMuted && !isSessionPaused) {
-    setTimeout(() => {
-      if (isLiveModeActive && !isAiSpeaking && !isMicMuted && !isSessionPaused) {
-        try { recognition.start(); } catch (e) {}
-      }
-    }, 200);
-  }
-}
-
-voiceMuteBtn.addEventListener('click', () => {
-  isMicMuted = !isMicMuted;
-  if (isMicMuted) {
-    if (recognition) try { recognition.stop(); } catch (e) {}
-    voiceMuteBtn.classList.add('muted');
-    micOnIcon.style.display = 'none';
-    micOffIcon.style.display = 'block';
-    voiceTranscriptText.innerText = "Microphone Muted 🔇";
-  } else {
-    voiceMuteBtn.classList.remove('muted');
-    micOnIcon.style.display = 'block';
-    micOffIcon.style.display = 'none';
-    voiceTranscriptText.innerText = "Listening to you...";
-    restartRecognitionSafe();
-  }
-});
-
-voicePauseBtn.addEventListener('click', () => {
-  isSessionPaused = !isSessionPaused;
-  if (isSessionPaused) {
-    if (recognition) try { recognition.stop(); } catch (e) {}
-    if (window.speechSynthesis.speaking) window.speechSynthesis.cancel();
-    voicePauseBtn.classList.add('paused');
-    pauseIcon.style.display = 'none';
-    playIcon.style.display = 'block';
-    voiceTranscriptText.innerText = "Session Paused ⏸️";
-  } else {
-    voicePauseBtn.classList.remove('paused');
-    pauseIcon.style.display = 'block';
-    playIcon.style.display = 'none';
-    voiceTranscriptText.innerText = "Listening to you...";
-    restartRecognitionSafe();
-  }
-});
-
 function startLiveVoiceSession() {
   isLiveModeActive = true;
-  isMicMuted = false;
-  isSessionPaused = false;
-  isAiSpeaking = false;
-  voiceMuteBtn.classList.remove('muted');
-  voicePauseBtn.classList.remove('paused');
-  micOnIcon.style.display = 'block';
-  micOffIcon.style.display = 'none';
-  pauseIcon.style.display = 'block';
-  playIcon.style.display = 'none';
   showScreen(voiceScreen);
   if (window.speechSynthesis.speaking) window.speechSynthesis.cancel();
   try { recognition.start(); } catch (e) {}
@@ -593,9 +373,7 @@ function startLiveVoiceSession() {
 
 voiceCloseScreenBtn.addEventListener('click', () => {
   isLiveModeActive = false;
-  isAiSpeaking = false;
-  stopCameraStream();
-  if (recognition) try { recognition.stop(); } catch (e) {}
+  if (recognition) recognition.stop();
   if (window.speechSynthesis.speaking) window.speechSynthesis.cancel();
   showScreen(homeScreen);
 });
@@ -603,65 +381,84 @@ voiceCloseScreenBtn.addEventListener('click', () => {
 voiceBackBtn.addEventListener('click', () => voiceCloseScreenBtn.click());
 
 voiceMainMicBtn.addEventListener('click', () => {
-  if (isListening) try { recognition.stop(); } catch (e) {}
-  else try { recognition.start(); } catch (e) {}
+  if (isListening) recognition.stop();
+  else recognition.start();
 });
 
 micBtn.addEventListener('click', () => {
   if (!recognition) return;
-  if (isListening) try { recognition.stop(); } catch (e) {}
-  else try { recognition.start(); } catch (e) {}
+  if (isListening) recognition.stop();
+  else recognition.start();
 });
 
-window.speakText = function(text, isLive = false) {
+window.speakText = function(btn, text, isLive = false) {
   if (!window.speechSynthesis) return;
-  window.speechSynthesis.cancel();
 
-  isAiSpeaking = true;
+  if (window.speechSynthesis.speaking) {
+    window.speechSynthesis.cancel();
+    return;
+  }
 
-  const cleanText = text
-    .replace(/```[\s\S]*?```/g, 'Code block.')
-    .replace(/[*#`_~]/g, '')
-    .trim();
-
+  const cleanText = text.replace(/```[\s\S]*?```/g, '').replace(/[*#`_~]/g, '').trim();
   const utterance = new SpeechSynthesisUtterance(cleanText);
-  utterance.rate = 1.2;
-  utterance.pitch = 1.05;
+  utterance.rate = 1.05;
 
   utterance.onend = () => {
-    isAiSpeaking = false;
-    if (isLiveModeActive && !isMicMuted && !isSessionPaused) {
+    if (isLiveModeActive && recognition) {
       voiceTranscriptText.innerText = "Listening again...";
-      restartRecognitionSafe();
+      try { recognition.start(); } catch (e) {}
     }
   };
 
   window.speechSynthesis.speak(utterance);
 };
 
+// ==========================================
+// 5. ATTACHMENTS & HISTORY
+// ==========================================
+attachBtn.addEventListener('click', () => filePicker.click());
+
+filePicker.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    attachedFile = { type: 'doc', name: file.name, content: reader.result.slice(0, 12000) };
+    fileName.innerText = file.name;
+    attachmentBar.style.display = 'block';
+    sendBtn.disabled = false;
+  };
+  reader.readAsText(file);
+});
+
+removeFileBtn.addEventListener('click', () => {
+  attachedFile = null;
+  filePicker.value = '';
+  attachmentBar.style.display = 'none';
+  sendBtn.disabled = !userInput.value.trim();
+});
+
 function renderHomeHistory() {
   homeRecentHistoryList.innerHTML = '';
   const keys = Object.keys(chats).reverse().slice(0, 4);
   keys.forEach(id => {
-    const item = document.createElement('div');
-    item.className = 'history-item-pill';
-    item.innerHTML = `
-      <span>💬 ${chats[id].title || 'AI Session'}</span>
-      <span style="color:#a855f7;">›</span>
+    const card = document.createElement('div');
+    card.className = 'history-card-item';
+    card.innerHTML = `
+      <div class="hist-left">
+        <div class="hist-icon-box">✦</div>
+        <span class="hist-title">${chats[id].title || 'AI Session'}</span>
+      </div>
+      <span style="color:#a855f7; font-size:12px;">›</span>
     `;
-    item.onclick = () => {
+    card.onclick = () => {
       loadSession(id);
       showScreen(chatScreen);
     };
-    homeRecentHistoryList.appendChild(item);
+    homeRecentHistoryList.appendChild(card);
   });
 }
-
-clearAllHistoryBtn.addEventListener('click', () => {
-  chats = {};
-  localStorage.removeItem('titan_ai_sessions');
-  renderHomeHistory();
-});
 
 function loadSession(id) {
   currentChatId = id;
@@ -673,9 +470,9 @@ function loadSession(id) {
     } else {
       const bRow = appendBotBubble();
       const bText = bRow.querySelector('.bot-text');
-      const spk = bRow.querySelector('.speaker-action-btn');
+      const spk = bRow.querySelector('.speaker-btn');
       bText.innerHTML = parseMarkdown(m.content);
-      spk.onclick = () => window.speakText(m.content);
+      spk.onclick = () => window.speakText(spk, m.content);
     }
   });
 }
