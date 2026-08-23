@@ -24,7 +24,7 @@
     <div class="welcome-auth-card">
       <div class="auth-mascot-badge">⚡</div>
       <h2>Welcome to Titan AI</h2>
-      <p>Sign in with your Google account to unlock Live Voice Mode, Real-Time Weather, and personalized chats.</p>
+      <p>Sign in with your Google account to unlock Live Voice Mode, Real-Time Vision, and instant chats.</p>
       <div class="auth-btn-wrapper">
         <div id="googleModalBtnContainer"></div>
       </div>
@@ -62,7 +62,6 @@
         </button>
       </div>
 
-      <!-- Bento Grid -->
       <div class="bento-grid">
         <div class="bento-card" id="cardNewChat">
           <div class="bento-card-top">
@@ -87,8 +86,8 @@
             <div class="icon-tag blue-bg">🎙️</div>
             <span class="arrow-sym">↗</span>
           </div>
-          <h3>Voice Live</h3>
-          <p>Multi-voice hands-free conversational loop.</p>
+          <h3>Voice & Vision Live</h3>
+          <p>Hands-free voice with live camera vision.</p>
         </div>
 
         <div class="bento-card" id="cardLiveWeather">
@@ -101,7 +100,6 @@
         </div>
       </div>
 
-      <!-- History -->
       <div class="history-block">
         <div class="history-title-row">
           <h3>Recent History</h3>
@@ -119,7 +117,7 @@
         </button>
         <div class="chat-header-center">
           <h3 class="header-nav-title">Titan Assistant</h3>
-          <span class="live-dot-status">● Ultra Fast Engine</span>
+          <span class="live-dot-status">● Fast Engine</span>
         </div>
         <button class="icon-btn-round" id="newChatTopBtn" title="New Chat">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
@@ -128,23 +126,14 @@
 
       <div class="chat-viewport" id="chatViewport"></div>
 
-      <!-- Bottom Chat Deck -->
       <div class="chat-deck">
         <div class="action-pill-carousel">
-          <button class="deck-pill" id="deckVoiceModeBtn">🎙️ Voice Mode</button>
+          <button class="deck-pill" id="deckVoiceModeBtn">🎙️ Voice & Vision</button>
           <button class="deck-pill" id="deckReasoningBtn">💡 Deep Reasoning</button>
           <button class="deck-pill" id="deckCodeBtn">&lt;/&gt; Code Generator</button>
         </div>
 
         <div class="glowing-input-card">
-          <div class="attachment-bar" id="attachmentBar" style="display: none;">
-            <div class="attachment-pill">
-              <span id="fileIcon">📎</span>
-              <span id="fileName">file.txt</span>
-              <button id="removeFileBtn">✕</button>
-            </div>
-          </div>
-
           <div class="input-text-row">
             <span class="sparkle-symbol">✦</span>
             <textarea id="userInput" placeholder="Ask anything..." rows="1"></textarea>
@@ -152,11 +141,7 @@
 
           <div class="input-controls-row">
             <div class="left-controls">
-              <input type="file" id="filePicker" accept="image/*,.txt,.js,.py,.html,.css,.json,.md,.csv,.c,.cpp" hidden>
-              <button class="tool-circle-btn" id="attachBtn" title="Upload Attachment">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-              </button>
-              <span class="active-model-tag">Live Engine</span>
+              <span class="active-model-tag">Ultra Fast</span>
             </div>
 
             <div class="right-controls">
@@ -172,26 +157,29 @@
       </div>
     </section>
 
-    <!-- SCREEN 3: GEMINI LIVE VOICE SCREEN WITH MUTE & MULTI-VOICE PERSONAS -->
+    <!-- SCREEN 3: GEMINI LIVE VOICE & LIVE VISION -->
     <section class="app-screen" id="voiceScreen">
       <header class="screen-header">
         <button class="back-btn" id="voiceBackBtn">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
         </button>
-        <h3 class="header-nav-title">Gemini Live Voice</h3>
+        <h3 class="header-nav-title">Live Voice & Vision</h3>
         
         <div class="voice-model-selector-wrapper">
-          <select id="voiceModelSelect" class="voice-select-box">
-            <option value="female-natural">Persona: Nova (Warm Female)</option>
-            <option value="male-deep">Persona: Atlas (Deep Male)</option>
-            <option value="female-calm">Persona: Luna (Soft Calm)</option>
-            <option value="male-crisp">Persona: Orion (Energetic)</option>
-          </select>
+          <button class="camera-toggle-btn" id="cameraToggleBtn" title="Toggle Live Camera View">
+            📷 Camera
+          </button>
         </div>
       </header>
 
       <div class="orb-stage-wrapper">
-        <div class="iridescent-orb-container">
+        <div class="live-camera-container" id="cameraContainer" style="display: none;">
+          <video id="cameraStream" autoplay playsinline muted></video>
+          <canvas id="cameraCanvas" style="display: none;"></canvas>
+          <span class="live-cam-badge">● LIVE VISION ACTIVE</span>
+        </div>
+
+        <div class="iridescent-orb-container" id="orbContainer">
           <div class="orb-aura"></div>
           <div class="iridescent-orb">
             <div class="orb-inner-light"></div>
@@ -203,16 +191,20 @@
           <h3 id="voiceTranscriptText">"Listening to your voice..."</h3>
         </div>
 
-        <div class="voice-soundwave-row">
+        <div class="voice-soundwave-row" id="voiceSoundwaveRow">
           <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
         </div>
       </div>
 
       <div class="voice-controls-footer">
-        <!-- Live Microphone Mute Button -->
-        <button class="voice-mini-btn mute-btn" id="voiceMuteBtn" title="Mute Microphone">
+        <button class="voice-mini-btn" id="voiceMuteBtn" title="Mute Microphone">
           <svg id="micOnIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line></svg>
           <svg id="micOffIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;"><line x1="1" y1="1" x2="23" y2="23"></line><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"></path><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"></path><line x1="12" y1="19" x2="12" y2="23"></line></svg>
+        </button>
+
+        <button class="voice-mini-btn" id="voicePauseBtn" title="Pause / Resume Listening">
+          <svg id="pauseIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+          <svg id="playIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
         </button>
 
         <button class="large-glowing-mic-btn" id="voiceMainMicBtn">

@@ -1,6 +1,6 @@
 const GOOGLE_CLIENT_ID = "1027901085880-ltncq1or8f5lupuvnd7g1ea8uq4ierf9.apps.googleusercontent.com";
 
-// Modal & User Profile
+// Modal & Profiles
 const welcomeLoginModal = document.getElementById('welcomeLoginModal');
 const homeUserName = document.getElementById('homeUserName');
 const homeUserAvatar = document.getElementById('homeUserAvatar');
@@ -31,24 +31,31 @@ const deckVoiceModeBtn = document.getElementById('deckVoiceModeBtn');
 const deckReasoningBtn = document.getElementById('deckReasoningBtn');
 const deckCodeBtn = document.getElementById('deckCodeBtn');
 
+// Voice & Vision Elements
 const voiceBackBtn = document.getElementById('voiceBackBtn');
 const voiceCloseScreenBtn = document.getElementById('voiceCloseScreenBtn');
 const voiceMainMicBtn = document.getElementById('voiceMainMicBtn');
 const voiceTranscriptText = document.getElementById('voiceTranscriptText');
-const voiceModelSelect = document.getElementById('voiceModelSelect');
 const voiceMuteBtn = document.getElementById('voiceMuteBtn');
+const voicePauseBtn = document.getElementById('voicePauseBtn');
 const micOnIcon = document.getElementById('micOnIcon');
 const micOffIcon = document.getElementById('micOffIcon');
+const pauseIcon = document.getElementById('pauseIcon');
+const playIcon = document.getElementById('playIcon');
 
-const attachBtn = document.getElementById('attachBtn');
-const filePicker = document.getElementById('filePicker');
-const attachmentBar = document.getElementById('attachmentBar');
-const fileName = document.getElementById('fileName');
-const removeFileBtn = document.getElementById('removeFileBtn');
+// Camera Elements
+const cameraToggleBtn = document.getElementById('cameraToggleBtn');
+const cameraContainer = document.getElementById('cameraContainer');
+const orbContainer = document.getElementById('orbContainer');
+const cameraStream = document.getElementById('cameraStream');
+const cameraCanvas = document.getElementById('cameraCanvas');
 
-let attachedFile = null;
+let isSending = false;
 let isLiveModeActive = false;
 let isMicMuted = false;
+let isSessionPaused = false;
+let isCameraActive = false;
+let cameraMediaStream = null;
 let userSpeakingTimeout = null;
 let currentChatId = Date.now().toString();
 let chats = JSON.parse(localStorage.getItem('titan_ai_sessions') || '{}');
@@ -128,15 +135,16 @@ cardNewChat.addEventListener('click', () => {
 
 cardDeepResearch.addEventListener('click', () => {
   showScreen(chatScreen);
-  userInput.value = "Conduct a step-by-step deep analytical reasoning for: ";
+  userInput.value = "Conduct a step-by-step deep reasoning for: ";
   userInput.focus();
+  sendBtn.disabled = false;
 });
 
 cardVoiceLive.addEventListener('click', () => startLiveVoiceSession());
 
 cardLiveWeather.addEventListener('click', async () => {
   showScreen(chatScreen);
-  userInput.value = "What is the live weather status and forecast for my current location?";
+  userInput.value = "What is the live weather forecast in my area?";
   await handleSend();
 });
 
@@ -147,45 +155,70 @@ deckVoiceModeBtn.addEventListener('click', () => startLiveVoiceSession());
 deckReasoningBtn.addEventListener('click', () => {
   userInput.value = "Think step-by-step with deep reasoning: " + userInput.value;
   userInput.focus();
+  sendBtn.disabled = false;
 });
 deckCodeBtn.addEventListener('click', () => {
   userInput.value = "Write clean, fully-commented code for: " + userInput.value;
   userInput.focus();
+  sendBtn.disabled = false;
 });
 
 userInput.addEventListener('input', () => {
   userInput.style.height = 'auto';
   userInput.style.height = Math.min(userInput.scrollHeight, 100) + 'px';
-  sendBtn.disabled = !userInput.value.trim() && !attachedFile;
+  sendBtn.disabled = !userInput.value.trim();
 });
 
-// Live Weather
-async function getLiveWeatherContext() {
-  return new Promise((resolve) => {
-    if (!navigator.geolocation) return resolve('');
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        try {
-          const lat = pos.coords.latitude;
-          const lon = pos.coords.longitude;
-          const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`);
-          const data = await res.json();
-          const cw = data.current_weather;
-          resolve(`[User Location: Lat ${lat.toFixed(2)}, Lon ${lon.toFixed(2)} | Temp: ${cw.temperature}°C, Wind: ${cw.windspeed}km/h | Time: ${new Date().toLocaleTimeString()}]`);
-        } catch {
-          resolve('');
-        }
-      },
-      () => resolve(''),
-      { timeout: 4000 }
-    );
-  });
+// Camera Vision Handlers
+cameraToggleBtn.addEventListener('click', async () => {
+  if (isCameraActive) {
+    stopCameraStream();
+  } else {
+    try {
+      cameraMediaStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } }
+      });
+      cameraStream.srcObject = cameraMediaStream;
+      isCameraActive = true;
+      cameraToggleBtn.classList.add('active');
+      cameraToggleBtn.innerText = '📷 Stop Cam';
+      cameraContainer.style.display = 'block';
+      orbContainer.style.display = 'none';
+      voiceTranscriptText.innerText = "Camera active! Ask anything about what I see.";
+    } catch (err) {
+      alert("Camera permission is needed for live vision mode.");
+    }
+  }
+});
+
+function stopCameraStream() {
+  if (cameraMediaStream) {
+    cameraMediaStream.getTracks().forEach(track => track.stop());
+    cameraMediaStream = null;
+  }
+  isCameraActive = false;
+  cameraToggleBtn.classList.remove('active');
+  cameraToggleBtn.innerText = '📷 Camera';
+  cameraContainer.style.display = 'none';
+  orbContainer.style.display = 'block';
 }
 
-// Ultra-Fast Streaming Handler with Sentence-Level Voice Chunking
+function captureCurrentCameraFrame() {
+  if (!isCameraActive || !cameraStream.videoWidth) return null;
+  cameraCanvas.width = cameraStream.videoWidth;
+  cameraCanvas.height = cameraStream.videoHeight;
+  const ctx = cameraCanvas.getContext('2d');
+  ctx.drawImage(cameraStream, 0, 0, cameraCanvas.width, cameraCanvas.height);
+  return cameraCanvas.toDataURL('image/jpeg', 0.6);
+}
+
+// Single-Tap Instant Dispatch Lock
 async function handleSend(isLive = false) {
   const text = userInput.value.trim();
-  if (!text && !attachedFile) return;
+  if (!text || isSending) return;
+
+  isSending = true;
+  sendBtn.disabled = true;
 
   if (isListening && recognition) recognition.stop();
 
@@ -193,20 +226,13 @@ async function handleSend(isLive = false) {
     chats[currentChatId] = { title: text.slice(0, 24) || 'Session', messages: [] };
   }
 
-  const weatherContext = await getLiveWeatherContext();
-  let fullPrompt = text;
-  if (weatherContext && !chats[currentChatId].hasSentWeather) {
-    fullPrompt = `${weatherContext}\n${text}`;
-    chats[currentChatId].hasSentWeather = true;
-  }
+  const cameraFrame = isLive && isCameraActive ? captureCurrentCameraFrame() : null;
 
-  let payload = { role: 'user', content: fullPrompt };
   appendUserBubble(text);
-  chats[currentChatId].messages.push(payload);
+  chats[currentChatId].messages.push({ role: 'user', content: text });
 
   userInput.value = '';
   userInput.style.height = 'auto';
-  if (removeFileBtn) removeFileBtn.click();
 
   const botRow = appendBotBubble();
   const botText = botRow.querySelector('.bot-text');
@@ -216,7 +242,10 @@ async function handleSend(isLive = false) {
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages: chats[currentChatId].messages })
+      body: JSON.stringify({ 
+        messages: chats[currentChatId].messages,
+        image: cameraFrame
+      })
     });
 
     const reader = res.body.getReader();
@@ -238,7 +267,6 @@ async function handleSend(isLive = false) {
               botText.innerHTML = parseMarkdown(accumulated);
               chatViewport.scrollTop = chatViewport.scrollHeight;
 
-              // Sentence level instant voice playback
               if ((isLive || isLiveModeActive) && !hasSpokenFirstSentence && /[.?!]\s/.test(accumulated)) {
                 hasSpokenFirstSentence = true;
                 voiceTranscriptText.innerHTML = parseMarkdown(accumulated);
@@ -263,10 +291,17 @@ async function handleSend(isLive = false) {
 
   } catch {
     botText.innerHTML = '<span style="color:#ef4444;">⚠️ Connection failed.</span>';
+  } finally {
+    isSending = false;
+    sendBtn.disabled = !userInput.value.trim();
   }
 }
 
-sendBtn.addEventListener('click', () => handleSend(false));
+sendBtn.addEventListener('click', (e) => {
+  e.preventDefault();
+  handleSend(false);
+});
+
 userInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault();
@@ -295,7 +330,7 @@ function appendBotBubble() {
       <div class="bot-avatar-badge">⚡</div>
       <div class="bot-bubble-box">
         <div class="bot-text">...</div>
-        <button class="speaker-action-btn">🔊 Read Voice</button>
+        <button class="speaker-action-btn">🔊 Read</button>
       </div>
     </div>
   `;
@@ -308,7 +343,7 @@ function escapeHtml(text) {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-// Noise-Gated Live Voice Engine
+// Live Voice Engine
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recognition = null;
 let isListening = false;
@@ -322,11 +357,13 @@ if (SpeechRecognition) {
   recognition.onstart = () => {
     isListening = true;
     micBtn.classList.add('listening');
-    if (isLiveModeActive && !isMicMuted) voiceTranscriptText.innerText = "Listening to you...";
+    if (isLiveModeActive && !isMicMuted && !isSessionPaused) {
+      voiceTranscriptText.innerText = "Listening to you...";
+    }
   };
 
   recognition.onresult = async (event) => {
-    if (isMicMuted) return;
+    if (isMicMuted || isSessionPaused) return;
 
     let interimTranscript = '';
     let finalTranscript = '';
@@ -339,7 +376,6 @@ if (SpeechRecognition) {
 
     const detectedText = (finalTranscript || interimTranscript).trim();
 
-    // Noise Gate Filter: Ignore bursts / TV murmurs under 4 chars
     if (detectedText.length > 4) {
       if (window.speechSynthesis.speaking) {
         window.speechSynthesis.cancel();
@@ -351,12 +387,12 @@ if (SpeechRecognition) {
 
       clearTimeout(userSpeakingTimeout);
       userSpeakingTimeout = setTimeout(async () => {
-        if (detectedText.length > 3) {
+        if (detectedText.length > 3 && !isSending) {
           userInput.value = detectedText;
           if (recognition) recognition.stop();
           await handleSend(isLiveModeActive);
         }
-      }, 1100);
+      }, 1000);
     }
   };
 
@@ -368,17 +404,16 @@ if (SpeechRecognition) {
   recognition.onend = () => {
     isListening = false;
     micBtn.classList.remove('listening');
-    if (isLiveModeActive && !window.speechSynthesis.speaking && !isMicMuted) {
+    if (isLiveModeActive && !window.speechSynthesis.speaking && !isMicMuted && !isSessionPaused) {
       setTimeout(() => {
-        if (isLiveModeActive && !isMicMuted) {
+        if (isLiveModeActive && !isMicMuted && !isSessionPaused) {
           try { recognition.start(); } catch (e) {}
         }
-      }, 400);
+      }, 300);
     }
   };
 }
 
-// Mute / Unmute Handler
 voiceMuteBtn.addEventListener('click', () => {
   isMicMuted = !isMicMuted;
   if (isMicMuted) {
@@ -392,7 +427,27 @@ voiceMuteBtn.addEventListener('click', () => {
     micOnIcon.style.display = 'block';
     micOffIcon.style.display = 'none';
     voiceTranscriptText.innerText = "Listening to you...";
-    if (isLiveModeActive) {
+    if (isLiveModeActive && !isSessionPaused) {
+      try { recognition.start(); } catch (e) {}
+    }
+  }
+});
+
+voicePauseBtn.addEventListener('click', () => {
+  isSessionPaused = !isSessionPaused;
+  if (isSessionPaused) {
+    if (recognition) recognition.stop();
+    if (window.speechSynthesis.speaking) window.speechSynthesis.cancel();
+    voicePauseBtn.classList.add('paused');
+    pauseIcon.style.display = 'none';
+    playIcon.style.display = 'block';
+    voiceTranscriptText.innerText = "Session Paused ⏸️";
+  } else {
+    voicePauseBtn.classList.remove('paused');
+    pauseIcon.style.display = 'block';
+    playIcon.style.display = 'none';
+    voiceTranscriptText.innerText = "Listening to you...";
+    if (isLiveModeActive && !isMicMuted) {
       try { recognition.start(); } catch (e) {}
     }
   }
@@ -401,9 +456,13 @@ voiceMuteBtn.addEventListener('click', () => {
 function startLiveVoiceSession() {
   isLiveModeActive = true;
   isMicMuted = false;
+  isSessionPaused = false;
   voiceMuteBtn.classList.remove('muted');
+  voicePauseBtn.classList.remove('paused');
   micOnIcon.style.display = 'block';
   micOffIcon.style.display = 'none';
+  pauseIcon.style.display = 'block';
+  playIcon.style.display = 'none';
   showScreen(voiceScreen);
   if (window.speechSynthesis.speaking) window.speechSynthesis.cancel();
   try { recognition.start(); } catch (e) {}
@@ -411,6 +470,7 @@ function startLiveVoiceSession() {
 
 voiceCloseScreenBtn.addEventListener('click', () => {
   isLiveModeActive = false;
+  stopCameraStream();
   if (recognition) recognition.stop();
   if (window.speechSynthesis.speaking) window.speechSynthesis.cancel();
   showScreen(homeScreen);
@@ -429,36 +489,21 @@ micBtn.addEventListener('click', () => {
   else recognition.start();
 });
 
-// Dynamic Voice Persona TTS
 window.speakText = function(text, isLive = false) {
   if (!window.speechSynthesis) return;
-
   window.speechSynthesis.cancel();
 
   const cleanText = text
-    .replace(/```[\s\S]*?```/g, 'Code block omitted.')
+    .replace(/```[\s\S]*?```/g, 'Code block.')
     .replace(/[*#`_~]/g, '')
     .trim();
 
   const utterance = new SpeechSynthesisUtterance(cleanText);
-  const selectedModel = voiceModelSelect ? voiceModelSelect.value : 'female-natural';
-
-  if (selectedModel === 'female-natural') {
-    utterance.pitch = 1.15;
-    utterance.rate = 1.15;
-  } else if (selectedModel === 'male-deep') {
-    utterance.pitch = 0.8;
-    utterance.rate = 1.05;
-  } else if (selectedModel === 'female-calm') {
-    utterance.pitch = 1.0;
-    utterance.rate = 1.05;
-  } else if (selectedModel === 'male-crisp') {
-    utterance.pitch = 1.1;
-    utterance.rate = 1.2;
-  }
+  utterance.rate = 1.15;
+  utterance.pitch = 1.05;
 
   utterance.onend = () => {
-    if (isLiveModeActive && recognition && !isMicMuted) {
+    if (isLiveModeActive && recognition && !isMicMuted && !isSessionPaused) {
       voiceTranscriptText.innerText = "Listening again...";
       try { recognition.start(); } catch (e) {}
     }
@@ -466,30 +511,6 @@ window.speakText = function(text, isLive = false) {
 
   window.speechSynthesis.speak(utterance);
 };
-
-// History & File Attachments
-attachBtn.addEventListener('click', () => filePicker.click());
-
-filePicker.addEventListener('change', (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-
-  const reader = new FileReader();
-  reader.onload = () => {
-    attachedFile = { type: 'doc', name: file.name, content: reader.result.slice(0, 12000) };
-    fileName.innerText = file.name;
-    attachmentBar.style.display = 'block';
-    sendBtn.disabled = false;
-  };
-  reader.readAsText(file);
-});
-
-removeFileBtn?.addEventListener('click', () => {
-  attachedFile = null;
-  filePicker.value = '';
-  attachmentBar.style.display = 'none';
-  sendBtn.disabled = !userInput.value.trim();
-});
 
 function renderHomeHistory() {
   homeRecentHistoryList.innerHTML = '';
