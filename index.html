@@ -7,16 +7,15 @@
   <title>Titan AI</title>
 
   <link rel="manifest" href="/manifest.json">
-  <meta name="theme-color" content="#ffffff">
+  <meta name="theme-color" content="#0d0b14">
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
   <link rel="stylesheet" href="style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-  <!-- Document Parsers & Markdown Renderer -->
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
@@ -24,130 +23,187 @@
 </head>
 <body class="notranslate">
 
-  <div class="gemini-app-shell">
-    
-    <!-- SCREEN 0: MANDATORY GOOGLE AUTH GATE -->
-    <section class="screen-view active" id="authScreen">
-      <div class="auth-box">
-        <div class="gemini-sparkle-logo">✦</div>
-        <h2 class="auth-heading">Titan AI</h2>
-        <p class="auth-sub">Next-Generation Voice, Vision & Document Intelligence</p>
-        
-        <div class="auth-actions">
+  <div class="mobile-app-shell">
+
+    <!-- SCREEN 0: GOOGLE LOGIN GATE -->
+    <section class="app-screen active" id="authScreen">
+      <div class="auth-card">
+        <div class="aurora-glow-top"></div>
+        <div class="app-logo-sparkle">✦</div>
+        <h2>Titan AI</h2>
+        <p>Create, explore, and be inspired with next-gen intelligence.</p>
+        <div class="auth-btn-stack">
           <div id="googleLandingBtn"></div>
-          <button class="guest-action-btn" id="guestBtn">Continue as Guest</button>
+          <button class="ghost-btn" id="guestBtn">Continue as Guest</button>
         </div>
       </div>
     </section>
 
-    <!-- SCREEN 1: MAIN GEMINI CANVAS & CONVERSATION -->
-    <section class="screen-view" id="mainScreen">
-      <!-- Minimalist Top Navigation -->
-      <header class="gemini-top-nav">
-        <button class="nav-icon-btn" id="newChatBtn" title="New Chat">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-          </svg>
+    <!-- SCREEN 1: DARK AURORA HOME DASHBOARD -->
+    <section class="app-screen" id="homeScreen">
+      <div class="aurora-glow-top"></div>
+
+      <!-- Header -->
+      <div class="home-top-header">
+        <button class="icon-bubble-btn" id="menuBtn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
         </button>
-
-        <div class="user-avatar-badge" id="profileToggleBtn" title="Account / Logout">
-          <span id="userInitialBadge">U</span>
-          <img id="userProfileImg" src="" alt="Profile" style="display: none;">
+        <div class="header-profile-tag" id="profileBadge">
+          <img id="homeUserAvatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=Titan" alt="Avatar">
+          <span id="homeUserName">Titan User</span>
         </div>
-      </header>
-
-      <!-- Center Landing Canvas (Centered Greeting) -->
-      <div class="gemini-center-canvas" id="centerGreetingCanvas">
-        <h1 class="gemini-gradient-greeting" id="greetingText">
-          Hello, <span class="gradient-name" id="userGreetingName">there</span>
-        </h1>
       </div>
 
-      <!-- Active Chat Scroll Viewport -->
-      <div class="chat-messages-container" id="chatViewport" style="display: none;"></div>
+      <!-- Hero Title -->
+      <div class="home-hero-text">
+        <h1>Create, explore,<br>be inspired</h1>
+      </div>
 
-      <!-- Floating Attachment Preview Bar -->
-      <div class="attachment-float-bar" id="attachmentBar" style="display: none;">
-        <div class="attachment-tag">
+      <!-- Search Trigger Capsule -->
+      <div class="home-search-capsule" id="homeSearchTrigger">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#71717a" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" placeholder="Search or ask anything..." readonly>
+      </div>
+
+      <!-- Action Bento Slider -->
+      <div class="cards-horizontal-slider">
+        <div class="action-feature-card" id="cardTextWriter">
+          <div class="card-sparkle-badge">✦</div>
+          <div class="card-body">
+            <h3>AI text<br>writer</h3>
+          </div>
+          <span class="card-arrow-icon">↗</span>
+        </div>
+
+        <div class="action-feature-card" id="cardDocAnalysis">
+          <div class="card-sparkle-badge purple-badge">📄</div>
+          <div class="card-body">
+            <h3>PDF & Doc<br>analyst</h3>
+          </div>
+          <span class="card-arrow-icon">↗</span>
+        </div>
+
+        <div class="action-feature-card" id="cardVoiceMode">
+          <div class="card-sparkle-badge pink-badge">🎙️</div>
+          <div class="card-body">
+            <h3>AI voice<br>assistant</h3>
+          </div>
+          <span class="card-arrow-icon">↗</span>
+        </div>
+
+        <div class="action-feature-card" id="cardCodeTutor">
+          <div class="card-sparkle-badge orange-badge">&lt;/&gt;</div>
+          <div class="card-body">
+            <h3>Code tutor<br>& logic</h3>
+          </div>
+          <span class="card-arrow-icon">↗</span>
+        </div>
+      </div>
+
+      <!-- Recent History Section -->
+      <div class="history-container">
+        <div class="history-title-row">
+          <h3>History</h3>
+          <button id="seeAllHistoryBtn">See all</button>
+        </div>
+        <div class="history-list" id="homeHistoryList"></div>
+      </div>
+    </section>
+
+    <!-- SCREEN 2: CHAT INTERACTION VIEW -->
+    <section class="app-screen" id="chatScreen">
+      <!-- Chat Header -->
+      <div class="chat-top-header">
+        <button class="icon-bubble-btn" id="chatBackBtn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        </button>
+
+        <div class="chat-title-wrapper">
+          <div class="chat-sparkle-icon">✦</div>
+          <div>
+            <h4 id="chatActiveTopic">Text writer</h4>
+            <span id="chatActiveSub">Interactive Session</span>
+          </div>
+        </div>
+
+        <button class="icon-bubble-btn" id="newChatTopBtn" title="Reset Session">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+        </button>
+      </div>
+
+      <!-- Chat Stream Viewport -->
+      <div class="chat-viewport" id="chatViewport"></div>
+
+      <!-- Bottom Interaction Deck -->
+      <div class="chat-bottom-deck">
+        <!-- Floating Attachment Pill -->
+        <div class="attachment-preview-pill" id="attachmentBar" style="display: none;">
           <span id="fileIcon">📄</span>
           <span id="fileName">document.pdf</span>
-          <span id="fileStatus" class="tag-status">Ready</span>
-          <button id="removeFileBtn" class="tag-close-btn">✕</button>
+          <span id="fileStatusBadge">Ready</span>
+          <button id="removeFileBtn">✕</button>
         </div>
-      </div>
 
-      <!-- Bottom Gemini Floating Input Capsule -->
-      <div class="gemini-bottom-dock">
-        <div class="gemini-input-capsule">
+        <div class="chat-input-capsule">
           <input type="file" id="filePicker" accept=".pdf,.doc,.docx,.txt,.js,.py,.html,.css,.json,.csv,image/*" hidden>
-          <button class="capsule-icon-btn" id="attachBtn" title="Upload Document / PDF">
-            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
-          </button>
+          <input type="text" id="userInput" placeholder="Send message..." autocomplete="off">
           
-          <input type="text" id="userInput" placeholder="Ask Titan..." autocomplete="off">
+          <button class="capsule-circle-btn" id="chatMicBtn" title="Voice Input">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line></svg>
+          </button>
 
-          <div class="capsule-tools-cluster">
-            <button class="capsule-icon-btn" id="micBtn" title="Voice Input">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-                <line x1="12" y1="19" x2="12" y2="23"></line>
-                <line x1="8" y1="23" x2="16" y2="23"></line>
-              </svg>
-            </button>
-
-            <button class="capsule-icon-btn" id="camSnapBtn" title="Camera Vision">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-                <circle cx="12" cy="13" r="4"></circle>
-              </svg>
-            </button>
-          </div>
+          <button class="capsule-circle-btn" id="attachBtn" title="Upload Document">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          </button>
         </div>
-
-        <!-- Standalone Gemini Live Sparkle Button -->
-        <button class="gemini-live-sparkle-btn" id="geminiLiveBtn" title="Launch Gemini Live">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
-          </svg>
-        </button>
       </div>
     </section>
 
-    <!-- SCREEN 2: GEMINI LIVE (FULLSCREEN VOICE + REAL-TIME CAMERA STREAM) -->
-    <section class="screen-view" id="liveScreen">
-      <video id="liveCamVideo" class="live-cam-stream" autoplay playsinline muted style="display: none;"></video>
-      <canvas id="liveCamCanvas" style="display: none;"></canvas>
+    <!-- SCREEN 3: NEON ORB VOICE ASSISTANT -->
+    <section class="app-screen" id="voiceScreen">
+      <div class="chat-top-header">
+        <button class="icon-bubble-btn" id="voiceBackBtn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        </button>
 
-      <div class="live-overlay-container">
-        <header class="live-header-bar">
-          <button class="live-pill-btn" id="liveBackBtn">← Exit</button>
-          <div class="live-status-pill">
-            <span class="live-indicator-dot"></span>
-            <span id="liveStatusText">Live Listening</span>
-          </div>
-          <button class="live-pill-btn" id="liveCamToggleBtn">📷 Camera</button>
-        </header>
-
-        <div class="live-orb-stage">
-          <div class="live-gemini-orb" id="liveOrb"></div>
-          <div class="live-transcript-bubble">
-            <p id="liveTranscriptText">"Listening to you... Speak naturally"</p>
+        <div class="chat-title-wrapper">
+          <div class="chat-sparkle-icon">✦</div>
+          <div>
+            <h4>Voice Assistant</h4>
+            <span id="voiceStatusSub">Listening...</span>
           </div>
         </div>
 
-        <footer class="live-bottom-dock">
-          <button class="live-action-circle" id="liveMuteBtn" title="Mute/Unmute Mic">
-            <span id="muteIcon">🎙️</span>
-          </button>
-          <button class="live-action-circle" id="livePauseBtn" title="Pause/Resume">
-            <span id="pauseIcon">⏸️</span>
-          </button>
-          <button class="live-action-circle interrupt-btn" id="liveInterruptBtn" title="Stop AI Speaking">
-            ⚡ Stop AI
-          </button>
-          <button class="live-end-btn" id="liveEndBtn">End Live</button>
-        </footer>
+        <button class="icon-bubble-btn" id="voiceResetBtn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+        </button>
+      </div>
+
+      <!-- Center Neon Wave Particle Orb -->
+      <div class="voice-stage-center">
+        <div class="neon-mesh-orb-wrapper">
+          <div class="neon-mesh-glow"></div>
+          <div class="neon-particle-orb"></div>
+        </div>
+
+        <div class="voice-prompt-transcript">
+          <h3 id="voiceTranscriptText">"Tell me about this year's top trends..."</h3>
+        </div>
+      </div>
+
+      <!-- Voice Bottom Dock -->
+      <div class="voice-bottom-controls">
+        <button class="voice-aux-btn" id="voiceMuteToggle" title="Mute/Unmute">
+          <span id="muteLabel">🎙️</span>
+        </button>
+
+        <button class="voice-giant-mic-btn" id="voiceMainMicBtn">
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.5"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line></svg>
+        </button>
+
+        <button class="voice-aux-btn" id="voiceCloseBtn" title="Close Voice Mode">
+          ✕
+        </button>
       </div>
     </section>
 

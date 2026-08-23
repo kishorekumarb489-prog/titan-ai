@@ -22,7 +22,7 @@ app.get('/sw.js', (req, res) => {
   res.sendFile(path.join(__dirname, 'sw.js'));
 });
 
-// Auto-Detect Groq / OpenRouter API Key
+// Detect API Key (Groq or OpenRouter)
 const rawKey = process.env.GROQ_API_KEY || process.env.API_KEY || process.env.OPENROUTER_API_KEY || '';
 const apiKey = rawKey.trim();
 const isGroq = apiKey.startsWith('gsk_') || Boolean(process.env.GROQ_API_KEY);
@@ -36,16 +36,16 @@ const openai = new OpenAI({
   }
 });
 
-// Ultra-Fast Groq Production Models
+// Reliable Fallback Model Chains
 const GROQ_MODELS = [
   'llama-3.3-70b-versatile',
   'llama-3.1-8b-instant'
 ];
 
 const OPENROUTER_MODELS = [
-  'google/gemini-2.0-flash-exp:free',
   'meta-llama/llama-3.3-70b-instruct:free',
-  'meta-llama/llama-3.2-3b-instruct:free'
+  'google/gemini-2.0-flash-exp:free',
+  'mistralai/mistral-small-24b-instruct-2501:free'
 ];
 
 const targetModels = isGroq ? GROQ_MODELS : OPENROUTER_MODELS;
@@ -65,7 +65,7 @@ app.post('/api/chat', async (req, res) => {
 
   const systemPrompt = {
     role: 'system',
-    content: 'You are Titan AI, an intelligent, fast multimodal assistant. Provide accurate, clean, structured markdown responses.'
+    content: 'You are Titan AI, an advanced creative, analytical, and conversational AI assistant. Format all responses clearly using Markdown.'
   };
 
   const payload = [systemPrompt, ...messages.filter(m => m.role !== 'system')];
@@ -90,11 +90,11 @@ app.post('/api/chat', async (req, res) => {
       return res.end();
     } catch (err) {
       lastError = err.message || 'Model execution error';
-      console.warn(`[Titan AI] Model ${model} failed, switching to fallback...`);
+      console.warn(`Model ${model} failed, attempting next available fallback...`);
     }
   }
 
-  res.write(`data: ${JSON.stringify({ text: `\n\n⚠️ AI Error: ${lastError}` })}\n\n`);
+  res.write(`data: ${JSON.stringify({ text: `\n\n⚠️ AI Response Error: ${lastError}. Check API key and quota.` })}\n\n`);
   res.write('data: [DONE]\n\n');
   res.end();
 });

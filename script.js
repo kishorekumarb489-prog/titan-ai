@@ -1,77 +1,79 @@
+// Register Service Worker for PWA
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   });
 }
 
+// PDF.js Worker Configuration
 if (window.pdfjsLib) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
 
 const GOOGLE_CLIENT_ID = "1027901085880-ltncq1or8f5lupuvnd7g1ea8uq4ierf9.apps.googleusercontent.com";
 
+// --- DOM ELEMENTS ---
 // Screens
 const authScreen = document.getElementById('authScreen');
-const mainScreen = document.getElementById('mainScreen');
-const liveScreen = document.getElementById('liveScreen');
+const homeScreen = document.getElementById('homeScreen');
+const chatScreen = document.getElementById('chatScreen');
+const voiceScreen = document.getElementById('voiceScreen');
 
-// User Profile Elements
-const userInitialBadge = document.getElementById('userInitialBadge');
-const userProfileImg = document.getElementById('userProfileImg');
-const userGreetingName = document.getElementById('userGreetingName');
-const profileToggleBtn = document.getElementById('profileToggleBtn');
+// User & Profile
+const homeUserName = document.getElementById('homeUserName');
+const homeUserAvatar = document.getElementById('homeUserAvatar');
+const profileBadge = document.getElementById('profileBadge');
 const guestBtn = document.getElementById('guestBtn');
 
-// Chat & Canvas Elements
-const centerGreetingCanvas = document.getElementById('centerGreetingCanvas');
+// Navigation Triggers
+const homeSearchTrigger = document.getElementById('homeSearchTrigger');
+const cardTextWriter = document.getElementById('cardTextWriter');
+const cardDocAnalysis = document.getElementById('cardDocAnalysis');
+const cardVoiceMode = document.getElementById('cardVoiceMode');
+const cardCodeTutor = document.getElementById('cardCodeTutor');
+const homeHistoryList = document.getElementById('homeHistoryList');
+
+// Chat Viewport & Inputs
 const chatViewport = document.getElementById('chatViewport');
 const userInput = document.getElementById('userInput');
-const newChatBtn = document.getElementById('newChatBtn');
-const geminiLiveBtn = document.getElementById('geminiLiveBtn');
-const micBtn = document.getElementById('micBtn');
-const camSnapBtn = document.getElementById('camSnapBtn');
-
-// Attachment Elements
+const chatMicBtn = document.getElementById('chatMicBtn');
 const attachBtn = document.getElementById('attachBtn');
 const filePicker = document.getElementById('filePicker');
+const chatBackBtn = document.getElementById('chatBackBtn');
+const newChatTopBtn = document.getElementById('newChatTopBtn');
+const chatActiveTopic = document.getElementById('chatActiveTopic');
+const chatActiveSub = document.getElementById('chatActiveSub');
+
+// Attachment Previews
 const attachmentBar = document.getElementById('attachmentBar');
 const fileIcon = document.getElementById('fileIcon');
 const fileName = document.getElementById('fileName');
-const fileStatus = document.getElementById('fileStatus');
+const fileStatusBadge = document.getElementById('fileStatusBadge');
 const removeFileBtn = document.getElementById('removeFileBtn');
 
-// Gemini Live Elements
-const liveCamVideo = document.getElementById('liveCamVideo');
-const liveCamCanvas = document.getElementById('liveCamCanvas');
-const liveOrb = document.getElementById('liveOrb');
-const liveTranscriptText = document.getElementById('liveTranscriptText');
-const liveStatusText = document.getElementById('liveStatusText');
-const liveBackBtn = document.getElementById('liveBackBtn');
-const liveCamToggleBtn = document.getElementById('liveCamToggleBtn');
-const liveMuteBtn = document.getElementById('liveMuteBtn');
-const muteIcon = document.getElementById('muteIcon');
-const livePauseBtn = document.getElementById('livePauseBtn');
-const pauseIcon = document.getElementById('pauseIcon');
-const liveInterruptBtn = document.getElementById('liveInterruptBtn');
-const liveEndBtn = document.getElementById('liveEndBtn');
+// Voice Screen Elements
+const voiceBackBtn = document.getElementById('voiceBackBtn');
+const voiceCloseBtn = document.getElementById('voiceCloseBtn');
+const voiceResetBtn = document.getElementById('voiceResetBtn');
+const voiceMainMicBtn = document.getElementById('voiceMainMicBtn');
+const voiceMuteToggle = document.getElementById('voiceMuteToggle');
+const muteLabel = document.getElementById('muteLabel');
+const voiceTranscriptText = document.getElementById('voiceTranscriptText');
+const voiceStatusSub = document.getElementById('voiceStatusSub');
 
-// State Variables
+// --- STATE MANAGEMENT ---
 let attachedFile = null;
-let liveStream = null;
-let isCameraActive = false;
-let isLiveSessionRunning = false;
+let isVoiceActive = false;
 let isMuted = false;
-let isPaused = false;
-let liveAbortController = null;
 let currentChatId = Date.now().toString();
-let chats = JSON.parse(localStorage.getItem('titan_ai_sessions') || '{}');
+let chats = JSON.parse(localStorage.getItem('titan_dark_sessions') || '{}');
 
 function showScreen(screen) {
-  [authScreen, mainScreen, liveScreen].forEach(s => s.classList.remove('active'));
+  [authScreen, homeScreen, chatScreen, voiceScreen].forEach(s => s.classList.remove('active'));
   screen.classList.add('active');
 }
 
-// 1. GOOGLE IDENTITY AUTHENTICATION
+// 1. GOOGLE IDENTITY AUTHENTICATION GATE
 function parseJwt(token) {
   try {
     const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
@@ -85,45 +87,34 @@ window.handleCredentialResponse = function(response) {
   const user = parseJwt(response.credential);
   if (user) {
     const profile = { name: user.name, picture: user.picture };
-    localStorage.setItem('titan_user_profile', JSON.stringify(profile));
+    localStorage.setItem('titan_dark_profile', JSON.stringify(profile));
     applyUserProfile(profile);
-    showScreen(mainScreen);
+    showScreen(homeScreen);
   }
 };
 
 function applyUserProfile(user) {
-  const fullName = user.name || 'User';
-  const firstName = fullName.split(' ')[0];
-  userGreetingName.innerText = firstName;
-
-  if (user.picture) {
-    userProfileImg.src = user.picture;
-    userProfileImg.style.display = 'block';
-    userInitialBadge.style.display = 'none';
-  } else {
-    userInitialBadge.innerText = firstName.charAt(0).toUpperCase();
-    userInitialBadge.style.display = 'block';
-    userProfileImg.style.display = 'none';
-  }
+  homeUserName.innerText = user.name || 'Titan User';
+  if (user.picture) homeUserAvatar.src = user.picture;
 }
 
 guestBtn.addEventListener('click', () => {
-  applyUserProfile({ name: 'Guest' });
-  showScreen(mainScreen);
+  applyUserProfile({ name: 'Guest User', picture: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Guest' });
+  showScreen(homeScreen);
 });
 
-profileToggleBtn.addEventListener('click', () => {
+profileBadge.addEventListener('click', () => {
   if (confirm("Sign out of Titan AI?")) {
-    localStorage.removeItem('titan_user_profile');
+    localStorage.removeItem('titan_dark_profile');
     showScreen(authScreen);
   }
 });
 
 window.onload = function() {
-  const savedUser = localStorage.getItem('titan_user_profile');
+  const savedUser = localStorage.getItem('titan_dark_profile');
   if (savedUser) {
     applyUserProfile(JSON.parse(savedUser));
-    showScreen(mainScreen);
+    showScreen(homeScreen);
   } else {
     showScreen(authScreen);
   }
@@ -138,9 +129,11 @@ window.onload = function() {
       { theme: 'filled_blue', size: 'large', shape: 'pill' }
     );
   }
+
+  renderHistoryList();
 };
 
-// 2. DOCUMENT & FILE PARSER (PDF, DOCX, TXT, IMAGES)
+// 2. DOCUMENT, CODE & PHOTO PARSER
 async function parsePDF(arrayBuffer) {
   const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
   const pdf = await loadingTask.promise;
@@ -148,7 +141,8 @@ async function parsePDF(arrayBuffer) {
   for (let pageNum = 1; pageNum <= Math.min(pdf.numPages, 30); pageNum++) {
     const page = await pdf.getPage(pageNum);
     const textContent = await page.getTextContent();
-    fullText += `\n[Page ${pageNum}]\n` + textContent.items.map(item => item.str).join(' ');
+    const pageText = textContent.items.map(item => item.str).join(' ');
+    fullText += `\n[Page ${pageNum}]\n` + pageText;
   }
   return fullText;
 }
@@ -158,51 +152,67 @@ async function parseDOCX(arrayBuffer) {
     const result = await mammoth.extractRawText({ arrayBuffer: arrayBuffer });
     return result.value;
   }
-  return "DOCX reader not loaded.";
+  return "DOCX reader library not loaded.";
 }
 
 attachBtn.addEventListener('click', () => filePicker.click());
-camSnapBtn.addEventListener('click', () => filePicker.click());
 
 filePicker.addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
 
   const ext = file.name.split('.').pop().toLowerCase();
-  attachmentBar.style.display = 'block';
+  attachmentBar.style.display = 'inline-flex';
   fileName.innerText = file.name;
-  fileStatus.innerText = "Extracting...";
+  fileStatusBadge.innerText = "Processing...";
 
   try {
-    if (ext === 'pdf') {
+    if (file.type.startsWith('image/')) {
+      fileIcon.innerText = '🖼️';
+      const base64 = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.readAsDataURL(file);
+      });
+      attachedFile = {
+        type: 'image',
+        name: file.name,
+        content: base64
+      };
+    } else if (ext === 'pdf') {
       fileIcon.innerText = '📕';
       const arrayBuffer = await file.arrayBuffer();
-      const extracted = await parsePDF(arrayBuffer);
-      attachedFile = { type: 'doc', name: file.name, content: extracted.slice(0, 30000) };
+      const extractedText = await parsePDF(arrayBuffer);
+      attachedFile = {
+        type: 'doc',
+        name: file.name,
+        content: extractedText.slice(0, 30000)
+      };
     } else if (ext === 'docx' || ext === 'doc') {
       fileIcon.innerText = '📘';
       const arrayBuffer = await file.arrayBuffer();
-      const extracted = await parseDOCX(arrayBuffer);
-      attachedFile = { type: 'doc', name: file.name, content: extracted.slice(0, 30000) };
-    } else if (file.type.startsWith('image/')) {
-      fileIcon.innerText = '🖼️';
-      const base64 = await new Promise((res) => {
-        const reader = new FileReader();
-        reader.onload = () => res(reader.result);
-        reader.readAsDataURL(file);
-      });
-      attachedFile = { type: 'image', name: file.name, content: base64 };
+      const extractedText = await parseDOCX(arrayBuffer);
+      attachedFile = {
+        type: 'doc',
+        name: file.name,
+        content: extractedText.slice(0, 30000)
+      };
     } else {
+      // Code, TXT, CSV, JSON
       fileIcon.innerText = '📄';
       const text = await file.text();
-      attachedFile = { type: 'doc', name: file.name, content: text.slice(0, 30000) };
+      attachedFile = {
+        type: 'doc',
+        name: file.name,
+        content: text.slice(0, 30000)
+      };
     }
 
-    fileStatus.innerText = "Ready";
+    fileStatusBadge.innerText = "Ready";
     userInput.focus();
   } catch (err) {
-    fileStatus.innerText = "Error";
-    alert(`File parsing failed: ${err.message}`);
+    fileStatusBadge.innerText = "Error";
+    alert(`File upload failed: ${err.message}`);
   }
 });
 
@@ -222,19 +232,20 @@ if (SpeechRecognition) {
   recognition.continuous = false;
   recognition.interimResults = false;
 
+  // Auto barge-in: Talking immediately stops AI voice readout
   recognition.onspeechstart = () => {
     if (window.speechSynthesis.speaking) {
       window.speechSynthesis.cancel();
-      liveStatusText.innerText = "Interrupted • Listening...";
+      if (isVoiceActive) voiceStatusSub.innerText = "Interrupted • Listening...";
     }
   };
 
   recognition.onresult = async (event) => {
     const speech = event.results[0][0].transcript;
-    if (speech.trim() && !isPaused && !isMuted) {
-      if (isLiveSessionRunning) {
-        liveTranscriptText.innerText = `"${speech}"`;
-        await handleLiveExchange(speech);
+    if (speech.trim() && !isMuted) {
+      if (isVoiceActive) {
+        voiceTranscriptText.innerText = `"${speech}"`;
+        await handleVoiceExchange(speech);
       } else {
         userInput.value = speech;
         handleSend();
@@ -243,9 +254,9 @@ if (SpeechRecognition) {
   };
 
   recognition.onend = () => {
-    if (isLiveSessionRunning && !isPaused && !isMuted && !window.speechSynthesis.speaking) {
+    if (isVoiceActive && !isMuted && !window.speechSynthesis.speaking) {
       setTimeout(() => {
-        if (isLiveSessionRunning && !isPaused && !isMuted) {
+        if (isVoiceActive && !isMuted) {
           try { recognition.start(); } catch (e) {}
         }
       }, 350);
@@ -253,142 +264,67 @@ if (SpeechRecognition) {
   };
 }
 
-// 4. GEMINI LIVE FULLSCREEN ENGINE
-async function startGeminiLive(withCamera = false) {
-  isLiveSessionRunning = true;
-  isPaused = false;
+// 4. NEON ORB VOICE ASSISTANT
+function startVoiceSession(promptText = "Listening to you...") {
+  isVoiceActive = true;
   isMuted = false;
-  muteIcon.innerText = "🎙️";
-  pauseIcon.innerText = "⏸️";
-
-  showScreen(liveScreen);
-  liveTranscriptText.innerText = "Listening to you... Speak naturally";
-
-  if (withCamera) await enableLiveCamera();
-  else disableLiveCamera();
+  muteLabel.innerText = "🎙️";
+  voiceStatusSub.innerText = "Listening...";
+  voiceTranscriptText.innerText = promptText;
+  showScreen(voiceScreen);
 
   if (window.speechSynthesis) window.speechSynthesis.cancel();
   try { recognition && recognition.start(); } catch (e) {}
 }
 
-async function enableLiveCamera() {
-  try {
-    liveStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
-      audio: false
-    });
-    liveCamVideo.srcObject = liveStream;
-    liveCamVideo.style.display = 'block';
-    liveOrb.style.display = 'none';
-    isCameraActive = true;
-  } catch {
-    alert("Camera permission not granted.");
-  }
-}
-
-function disableLiveCamera() {
-  if (liveStream) {
-    liveStream.getTracks().forEach(t => t.stop());
-    liveStream = null;
-  }
-  liveCamVideo.style.display = 'none';
-  liveOrb.style.display = 'block';
-  isCameraActive = false;
-}
-
-liveCamToggleBtn.addEventListener('click', () => {
-  if (isCameraActive) disableLiveCamera();
-  else enableLiveCamera();
-});
-
-function captureCameraFrame() {
-  if (!isCameraActive || !liveCamVideo.videoWidth) return null;
-  liveCamCanvas.width = liveCamVideo.videoWidth;
-  liveCamCanvas.height = liveCamVideo.videoHeight;
-  const ctx = liveCamCanvas.getContext('2d');
-  ctx.drawImage(liveCamVideo, 0, 0);
-  return liveCamCanvas.toDataURL('image/jpeg', 0.7);
-}
-
-function endGeminiLive() {
-  isLiveSessionRunning = false;
-  disableLiveCamera();
-  if (liveAbortController) liveAbortController.abort();
+function stopVoiceSession() {
+  isVoiceActive = false;
   if (recognition) recognition.stop();
   if (window.speechSynthesis) window.speechSynthesis.cancel();
-  showScreen(mainScreen);
+  showScreen(homeScreen);
 }
 
-geminiLiveBtn.addEventListener('click', () => startGeminiLive(false));
-liveBackBtn.addEventListener('click', endGeminiLive);
-liveEndBtn.addEventListener('click', endGeminiLive);
+voiceBackBtn.addEventListener('click', stopVoiceSession);
+voiceCloseBtn.addEventListener('click', stopVoiceSession);
 
-liveInterruptBtn.addEventListener('click', () => {
+voiceResetBtn.addEventListener('click', () => {
   if (window.speechSynthesis) window.speechSynthesis.cancel();
-  if (liveAbortController) liveAbortController.abort();
-  liveTranscriptText.innerText = "Interrupted! Listening to you...";
-  if (!isPaused && !isMuted) {
-    try { recognition && recognition.start(); } catch (e) {}
-  }
+  voiceTranscriptText.innerText = "Listening to you... Speak anytime.";
+  try { recognition && recognition.start(); } catch (e) {}
 });
 
-liveMuteBtn.addEventListener('click', () => {
+voiceMainMicBtn.addEventListener('click', () => {
+  try { recognition && recognition.start(); } catch (e) {}
+});
+
+voiceMuteToggle.addEventListener('click', () => {
   isMuted = !isMuted;
   if (isMuted) {
     if (recognition) recognition.stop();
-    muteIcon.innerText = "🔇";
-    liveStatusText.innerText = "Microphone Muted";
+    muteLabel.innerText = "🔇";
+    voiceStatusSub.innerText = "Muted";
   } else {
-    muteIcon.innerText = "🎙️";
-    liveStatusText.innerText = "Live Listening";
-    if (!isPaused && !window.speechSynthesis.speaking) {
+    muteLabel.innerText = "🎙️";
+    voiceStatusSub.innerText = "Listening...";
+    if (!window.speechSynthesis.speaking) {
       try { recognition && recognition.start(); } catch (e) {}
     }
   }
 });
 
-livePauseBtn.addEventListener('click', () => {
-  isPaused = !isPaused;
-  if (isPaused) {
-    if (recognition) recognition.stop();
-    if (window.speechSynthesis) window.speechSynthesis.pause();
-    pauseIcon.innerText = "▶️";
-    liveStatusText.innerText = "Session Paused";
-  } else {
-    pauseIcon.innerText = "⏸️";
-    liveStatusText.innerText = "Live Listening";
-    if (window.speechSynthesis.paused) {
-      window.speechSynthesis.resume();
-    } else if (!window.speechSynthesis.speaking && !isMuted) {
-      try { recognition && recognition.start(); } catch (e) {}
-    }
-  }
-});
-
-// 5. LIVE MULTIMODAL EXCHANGE
-async function handleLiveExchange(userSpeech) {
-  if (liveAbortController) liveAbortController.abort();
-  liveAbortController = new AbortController();
-
-  const photoFrame = captureCameraFrame();
-  let prompt = userSpeech;
-  if (photoFrame) {
-    prompt = `[Live Camera Viewfinder Active]\nUser says: ${userSpeech}`;
-  }
+async function handleVoiceExchange(userSpeech) {
+  voiceStatusSub.innerText = "Titan Thinking...";
 
   if (!chats[currentChatId]) {
-    chats[currentChatId] = { title: userSpeech.slice(0, 20), messages: [] };
+    chats[currentChatId] = { title: userSpeech.slice(0, 24), topic: "Voice Assistant", messages: [] };
   }
-  chats[currentChatId].messages.push({ role: 'user', content: prompt });
-
-  liveStatusText.innerText = "Titan Thinking...";
+  chats[currentChatId].messages.push({ role: 'user', content: userSpeech });
 
   try {
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages: chats[currentChatId].messages }),
-      signal: liveAbortController.signal
+      body: JSON.stringify({ messages: chats[currentChatId].messages })
     });
 
     const reader = res.body.getReader();
@@ -405,7 +341,7 @@ async function handleLiveExchange(userSpeech) {
             const data = JSON.parse(line.replace('data: ', ''));
             if (data.text) {
               accumulated += data.text;
-              liveTranscriptText.innerHTML = marked.parse(accumulated);
+              voiceTranscriptText.innerHTML = marked.parse(accumulated);
             }
           } catch (e) {}
         }
@@ -413,31 +349,31 @@ async function handleLiveExchange(userSpeech) {
     }
 
     chats[currentChatId].messages.push({ role: 'assistant', content: accumulated });
-    speakLiveResponse(accumulated);
+    localStorage.setItem('titan_dark_sessions', JSON.stringify(chats));
+    renderHistoryList();
+    speakVoiceResponse(accumulated);
 
   } catch (err) {
-    if (err.name !== 'AbortError') {
-      liveTranscriptText.innerText = "Listening again...";
-      if (!isPaused && !isMuted) {
-        try { recognition && recognition.start(); } catch (e) {}
-      }
+    voiceStatusSub.innerText = "Connection glitch. Re-listening...";
+    if (!isMuted) {
+      try { recognition && recognition.start(); } catch (e) {}
     }
   }
 }
 
-function speakLiveResponse(text) {
-  if (!window.speechSynthesis || isPaused) return;
+function speakVoiceResponse(text) {
+  if (!window.speechSynthesis) return;
   window.speechSynthesis.cancel();
 
   const clean = text.replace(/[*#`_~]/g, '').trim();
   const utterance = new SpeechSynthesisUtterance(clean);
   utterance.rate = 1.05;
 
-  utterance.onstart = () => { liveStatusText.innerText = "Titan Speaking..."; };
+  utterance.onstart = () => { voiceStatusSub.innerText = "Titan Speaking..."; };
   utterance.onend = () => {
-    if (isLiveSessionRunning && !isPaused && !isMuted) {
-      liveStatusText.innerText = "Live Listening";
-      liveTranscriptText.innerText = "Listening to you...";
+    if (isVoiceActive && !isMuted) {
+      voiceStatusSub.innerText = "Listening...";
+      voiceTranscriptText.innerText = "Listening to you...";
       try { recognition && recognition.start(); } catch (e) {}
     }
   };
@@ -445,29 +381,50 @@ function speakLiveResponse(text) {
   window.speechSynthesis.speak(utterance);
 }
 
-// 6. MAIN CHAT HANDLER
+// 5. CHAT DISPATCH ENGINE (TEXT, DOCS & VISION)
 async function handleSend() {
   const text = userInput.value.trim();
   if (!text && !attachedFile) return;
 
-  centerGreetingCanvas.style.display = 'none';
-  chatViewport.style.display = 'flex';
-
   if (!chats[currentChatId]) {
-    chats[currentChatId] = { title: (attachedFile ? attachedFile.name : text).slice(0, 20), messages: [] };
+    chats[currentChatId] = {
+      title: (attachedFile ? attachedFile.name : text).slice(0, 24),
+      topic: chatActiveTopic.innerText || "AI Chat",
+      messages: []
+    };
   }
 
-  let prompt = text;
+  let promptPayload;
+  let userDisplayHtml = text;
+
   if (attachedFile) {
-    if (attachedFile.type === 'doc') {
-      prompt = `[Document: ${attachedFile.name}]\n\`\`\`text\n${attachedFile.content}\n\`\`\`\n\nPrompt:\n${text || 'Summarize this file.'}`;
+    if (attachedFile.type === 'image') {
+      // Vision Multimodal Payload for Groq
+      promptPayload = [
+        { type: "text", text: text || "Analyze and describe this photo." },
+        { type: "image_url", image_url: { url: attachedFile.content } }
+      ];
+      userDisplayHtml = `
+        <div style="margin-bottom: 8px;">
+          <img src="${attachedFile.content}" style="max-width: 180px; max-height: 180px; border-radius: 12px; display: block;" alt="Uploaded photo" />
+        </div>
+        <div>${escapeHtml(text) || 'Analyze this image.'}</div>
+      `;
     } else {
-      prompt = `[Image Attached: ${attachedFile.name}]\n${text || 'Analyze this image.'}`;
+      // Document / Code Payload
+      promptPayload = `[Document Attached: ${attachedFile.name}]\n\`\`\`text\n${attachedFile.content}\n\`\`\`\n\nPrompt:\n${text || 'Provide a comprehensive overview of this document.'}`;
+      userDisplayHtml = `
+        <div style="font-size: 12px; opacity: 0.9; margin-bottom: 4px;">📄 ${escapeHtml(attachedFile.name)}</div>
+        <div>${escapeHtml(text) || 'Summarize this file.'}</div>
+      `;
     }
+  } else {
+    promptPayload = text;
+    userDisplayHtml = escapeHtml(text);
   }
 
-  appendBubble(text || `Uploaded: ${attachedFile?.name}`, 'user');
-  chats[currentChatId].messages.push({ role: 'user', content: prompt });
+  appendBubble(userDisplayHtml, 'user', true);
+  chats[currentChatId].messages.push({ role: 'user', content: promptPayload });
 
   userInput.value = '';
   if (removeFileBtn) removeFileBtn.click();
@@ -502,37 +459,128 @@ async function handleSend() {
         }
       }
     }
+
     chats[currentChatId].messages.push({ role: 'assistant', content: accumulated });
-    localStorage.setItem('titan_ai_sessions', JSON.stringify(chats));
+    localStorage.setItem('titan_dark_sessions', JSON.stringify(chats));
+    renderHistoryList();
+
   } catch {
-    botBox.innerHTML = '⚠️ Connection error with AI engine.';
+    botBox.innerHTML = '⚠️ Error communicating with Groq AI engine.';
   }
 }
 
-function appendBubble(text, role) {
+function appendBubble(content, role, isRawHtml = false) {
   const row = document.createElement('div');
-  row.className = `chat-row ${role}`;
+  row.className = `chat-bubble-row ${role}`;
   const box = document.createElement('div');
-  box.className = role === 'user' ? 'user-msg-bubble' : 'bot-msg-bubble';
-  box.innerHTML = text;
+  box.className = role === 'user' ? 'user-bubble-box' : 'bot-bubble-box';
+
+  if (isRawHtml) {
+    box.innerHTML = content;
+  } else {
+    box.innerHTML = escapeHtml(content);
+  }
+
+  if (role === 'bot') {
+    const actionRow = document.createElement('div');
+    actionRow.className = 'bot-action-row';
+    actionRow.innerHTML = `
+      <button class="bot-action-btn" title="Copy Text" onclick="navigator.clipboard.writeText(this.closest('.bot-bubble-box').innerText)">📋</button>
+      <button class="bot-action-btn" title="Read Aloud" onclick="window.speechSynthesis.speak(new SpeechSynthesisUtterance(this.closest('.bot-bubble-box').innerText))">🔊</button>
+    `;
+    box.appendChild(actionRow);
+  }
+
   row.appendChild(box);
   chatViewport.appendChild(row);
   chatViewport.scrollTop = chatViewport.scrollHeight;
   return box;
 }
 
-newChatBtn.addEventListener('click', () => {
+function escapeHtml(text) {
+  if (!text) return '';
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// 6. DASHBOARD & HISTORY ROUTING
+function openChatWithTopic(topic, sub, initialPrompt = '') {
   currentChatId = Date.now().toString();
-  chats[currentChatId] = { title: 'New Chat', messages: [] };
+  chats[currentChatId] = { title: topic, topic: topic, messages: [] };
+  chatActiveTopic.innerText = topic;
+  chatActiveSub.innerText = sub;
   chatViewport.innerHTML = '';
-  chatViewport.style.display = 'none';
-  centerGreetingCanvas.style.display = 'flex';
+  showScreen(chatScreen);
+  if (initialPrompt) {
+    userInput.value = initialPrompt;
+    userInput.focus();
+  }
+}
+
+cardTextWriter.addEventListener('click', () => openChatWithTopic("Text writer", "Content & Copywriting"));
+cardDocAnalysis.addEventListener('click', () => {
+  openChatWithTopic("Doc Analyst", "PDF, Docs & Image Insights");
+  filePicker.click();
+});
+cardCodeTutor.addEventListener('click', () => openChatWithTopic("Code tutor", "Algorithms & Debugging", "How do I optimize: "));
+cardVoiceMode.addEventListener('click', () => startVoiceSession("Tell me about this year's top trends..."));
+homeSearchTrigger.addEventListener('click', () => openChatWithTopic("AI Assistant", "Interactive Chat"));
+
+chatBackBtn.addEventListener('click', () => showScreen(homeScreen));
+newChatTopBtn.addEventListener('click', () => {
+  currentChatId = Date.now().toString();
+  chatViewport.innerHTML = '';
 });
 
 userInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') handleSend();
 });
 
-micBtn.addEventListener('click', () => {
+chatMicBtn.addEventListener('click', () => {
   try { recognition && recognition.start(); } catch {}
 });
+
+function renderHistoryList() {
+  homeHistoryList.innerHTML = '';
+  const keys = Object.keys(chats).reverse().slice(0, 5);
+  keys.forEach(id => {
+    const item = chats[id];
+    const row = document.createElement('div');
+    row.className = 'history-item-row';
+    row.innerHTML = `
+      <div class="hist-left">
+        <div class="hist-icon">✦</div>
+        <div class="hist-info">
+          <h4>${escapeHtml(item.topic || 'AI Assistant')}</h4>
+          <p>${escapeHtml(item.title || 'Session')}</p>
+        </div>
+      </div>
+      <span class="hist-arrow">›</span>
+    `;
+    row.onclick = () => {
+      currentChatId = id;
+      chatActiveTopic.innerText = item.topic || 'AI Assistant';
+      chatActiveSub.innerText = item.title || 'Session';
+      chatViewport.innerHTML = '';
+      (item.messages || []).forEach(m => {
+        if (m.role === 'user') {
+          if (Array.isArray(m.content)) {
+            const txt = m.content.find(c => c.type === 'text')?.text || '';
+            const img = m.content.find(c => c.type === 'image_url')?.image_url?.url || '';
+            appendBubble(
+              `${img ? `<img src="${img}" style="max-width:180px; max-height:180px; border-radius:12px; display:block; margin-bottom:6px;">` : ''}${escapeHtml(txt)}`,
+              'user',
+              true
+            );
+          } else {
+            appendBubble(m.content, 'user');
+          }
+        } else {
+          const bBox = appendBubble('', 'bot');
+          bBox.innerHTML = marked.parse(m.content);
+        }
+      });
+      showScreen(chatScreen);
+    };
+    homeHistoryList.appendChild(row);
+  });
+}

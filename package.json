@@ -1,23 +1,23 @@
 {
   "name": "Titan AI",
   "short_name": "Titan AI",
-  "description": "Next-Gen Gemini-Style Multimodal Voice, Vision & Document AI Assistant.",
+  "description": "Creative & Intelligent Dark Aurora Voice & Text Assistant.",
   "id": "/",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#ffffff",
-  "theme_color": "#ffffff",
+  "background_color": "#0d0b14",
+  "theme_color": "#0d0b14",
   "icons": [
     {
-      "src": "https://api.dicebear.com/7.x/bottts/png?seed=TitanAIPro&backgroundColor=1a73e8&size=192",
+      "src": "https://api.dicebear.com/7.x/bottts/png?seed=TitanAIPro&backgroundColor=8b5cf6&size=192",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "https://api.dicebear.com/7.x/bottts/png?seed=TitanAIPro&backgroundColor=1a73e8&size=512",
+      "src": "https://api.dicebear.com/7.x/bottts/png?seed=TitanAIPro&backgroundColor=8b5cf6&size=512",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
