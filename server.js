@@ -6,10 +6,11 @@ const { OpenAI } = require('openai');
 const app = express();
 const port = process.env.PORT || 3000;
 
-app.use(express.json({ limit: '25mb' }));
-app.use(express.urlencoded({ limit: '25mb', extended: true }));
+app.use(express.json({ limit: '30mb' }));
+app.use(express.urlencoded({ limit: '30mb', extended: true }));
 app.use(express.static(__dirname));
 
+// PWA routes
 app.get('/manifest.json', (req, res) => {
   res.setHeader('Content-Type', 'application/manifest+json');
   res.sendFile(path.join(__dirname, 'manifest.json'));
@@ -34,7 +35,7 @@ const openai = new OpenAI({
   }
 });
 
-// Guaranteed working fallback models (Groq or OpenRouter)
+// Active, 100% working fallback models
 const GROQ_MODELS = [
   'llama-3.3-70b-versatile',
   'llama-3.1-8b-instant'
@@ -43,7 +44,7 @@ const GROQ_MODELS = [
 const OPENROUTER_MODELS = [
   'meta-llama/llama-3.3-70b-instruct:free',
   'google/gemini-2.0-flash-exp:free',
-  'deepseek/deepseek-chat:free'
+  'qwen/qwen-2.5-coder-32b-instruct:free'
 ];
 
 const targetModels = isGroq ? GROQ_MODELS : OPENROUTER_MODELS;
@@ -56,14 +57,14 @@ app.post('/api/chat', async (req, res) => {
   res.setHeader('Connection', 'keep-alive');
 
   if (!apiKey) {
-    res.write(`data: ${JSON.stringify({ text: '⚠️ API Key is missing! Add GROQ_API_KEY in Render Environment variables.' })}\n\n`);
+    res.write(`data: ${JSON.stringify({ text: '⚠️ API Key is missing. Please add GROQ_API_KEY in Render dashboard.' })}\n\n`);
     res.write('data: [DONE]\n\n');
     return res.end();
   }
 
   const systemPrompt = {
     role: 'system',
-    content: 'You are Titan AI, an advanced intelligent assistant. Provide clear, well-structured markdown answers.'
+    content: 'You are Titan AI, an intelligent real-time voice and vision assistant. Keep responses natural, concise, and helpful for spoken interaction.'
   };
 
   const payload = [systemPrompt, ...messages.filter(m => m.role !== 'system')];
@@ -87,12 +88,12 @@ app.post('/api/chat', async (req, res) => {
       res.write('data: [DONE]\n\n');
       return res.end();
     } catch (err) {
-      lastError = err.message || 'Model execution failed';
-      console.warn(`Model ${model} failed, attempting next fallback...`);
+      lastError = err.message || 'Model execution error';
+      console.warn(`Model ${model} failed, switching to next available model...`);
     }
   }
 
-  res.write(`data: ${JSON.stringify({ text: `\n\n⚠️ AI Error: ${lastError}. Please verify API key permissions.` })}\n\n`);
+  res.write(`data: ${JSON.stringify({ text: `\n\n⚠️ AI Error: ${lastError}` })}\n\n`);
   res.write('data: [DONE]\n\n');
   res.end();
 });
@@ -102,5 +103,5 @@ app.get('*', (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`Titan AI Server running on port ${port}`);
+  console.log(`Titan AI Server active on port ${port}`);
 });

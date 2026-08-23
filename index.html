@@ -23,58 +23,72 @@
 
   <div class="mobile-container">
     
+    <!-- SCREEN 0: MANDATORY GOOGLE LOGIN GATE -->
+    <section class="app-screen active" id="authScreen">
+      <div class="auth-card-wrapper">
+        <div class="massive-iridescent-orb" style="width: 140px; height: 140px;"></div>
+        <h2 class="auth-title">Titan AI</h2>
+        <p class="auth-subtitle">Next-Generation Real-Time Voice & Vision Intelligence.</p>
+        
+        <div class="google-auth-box">
+          <div id="googleLandingBtn"></div>
+          <button class="guest-btn" id="guestBtn">Continue as Guest</button>
+        </div>
+      </div>
+    </section>
+
     <!-- SCREEN 1: HOME DASHBOARD -->
-    <section class="app-screen active" id="homeScreen">
+    <section class="app-screen" id="homeScreen">
       <div class="screen-header">
         <div class="user-greeting">
           <div class="avatar-ring">
-            <img id="homeUserAvatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=TitanAIUser" alt="Avatar" class="header-avatar">
+            <img id="homeUserAvatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=Titan" alt="Avatar" class="header-avatar">
           </div>
           <div>
-            <span class="greeting-subtitle" id="greetingSub">Hi Amelia,</span>
-            <h4 class="greeting-name">Titan AI Assistant</h4>
+            <span class="greeting-subtitle" id="greetingSub">Hi there,</span>
+            <h4 class="greeting-name" id="homeUserName">Titan User</h4>
           </div>
         </div>
-        <div id="googleBtnContainer"></div>
+        <button class="icon-circle-btn" id="logoutBtn" title="Switch User">⚙️</button>
       </div>
 
-      <!-- HERO 3D ORB CENTERPIECE -->
+      <!-- Center 3D Iridescent Orb -->
       <div class="hero-orb-wrapper">
-        <div class="iridescent-orb-sm" id="homeOrbTrigger" title="Tap for Voice Mode"></div>
-        <p class="hero-subtext">Ask any question you have - your AI voice chatbot is always listening!</p>
+        <div class="iridescent-orb-sm" id="homeOrbTrigger" title="Tap to start live voice"></div>
+        <p class="hero-subtext">Tap orb for live voice and camera conversation.</p>
       </div>
 
-      <!-- 2X2 GLASS BENTO CARDS -->
+      <!-- 2x2 Glass Bento Cards -->
       <div class="glass-bento-grid">
-        <div class="glass-bento-card" id="cardVoiceChat">
-          <div class="bento-icon-title">🎙️ Voice Chat AI</div>
-          <p>Real-time conversational voice interaction.</p>
+        <div class="glass-bento-card" id="cardLiveGemini">
+          <div class="bento-icon-title">✨ Gemini Live</div>
+          <p>Real-time continuous voice & camera conversation.</p>
         </div>
 
         <div class="glass-bento-card" id="cardChatAI">
-          <div class="bento-icon-title">💬 Chat With AI</div>
-          <p>Intelligent Llama 3.3 text assistant.</p>
+          <div class="bento-icon-title">💬 Smart Chat</div>
+          <p>Llama 3.3 high-speed intelligent chat.</p>
         </div>
 
-        <div class="glass-bento-card" id="cardCameraScan">
-          <div class="bento-icon-title">📷 Scan & Search</div>
-          <p>Live camera object and text recognition.</p>
+        <div class="glass-bento-card" id="cardLiveVision">
+          <div class="bento-icon-title">📷 Live Vision</div>
+          <p>Real-time environment visual search.</p>
         </div>
 
-        <div class="glass-bento-card" id="cardReasoning">
-          <div class="bento-icon-title">⚡ Deep Reasoning</div>
-          <p>Step-by-step logic and code generation.</p>
+        <div class="glass-bento-card" id="cardDeepReason">
+          <div class="bento-icon-title">⚡ Reasoning</div>
+          <p>Step-by-step logic, code, and analysis.</p>
         </div>
       </div>
 
-      <!-- BOTTOM SEARCH CAPSULE -->
+      <!-- Bottom Capsule Search -->
       <div class="bottom-search-capsule" id="homeSearchTrigger">
-        <input type="text" id="homeInput" placeholder="Ask anything..." readonly>
+        <input type="text" placeholder="Ask anything..." readonly>
         <button class="sparkle-send-btn">✦</button>
       </div>
     </section>
 
-    <!-- SCREEN 2: CHAT CONVERSATION -->
+    <!-- SCREEN 2: SMART CHAT -->
     <section class="app-screen" id="chatScreen">
       <div class="screen-header">
         <button class="back-circle-btn" id="chatBackBtn">←</button>
@@ -86,62 +100,54 @@
 
       <div class="chat-bottom-deck">
         <div class="action-pill-carousel">
-          <button class="deck-pill" id="deckVoiceBtn">🎙️ Voice Mode</button>
-          <button class="deck-pill" id="deckCamBtn">📷 Live Camera</button>
-          <button class="deck-pill" id="deckReasonBtn">💡 Reasoning</button>
+          <button class="deck-pill" id="deckLiveBtn">✨ Gemini Live</button>
+          <button class="deck-pill" id="deckReasonBtn">💡 Deep Reasoning</button>
         </div>
 
-        <div class="attachment-bar" id="attachmentBar" style="display: none; margin-bottom: 8px;">
-          <div class="action-pill-carousel">
-            <span id="fileName" style="font-size: 12px; color: var(--primary-purple); font-weight: 600;">file.txt</span>
-            <button id="removeFileBtn" style="border:none; background:none; color:red; cursor:pointer; font-weight:bold;">✕</button>
-          </div>
+        <div class="attachment-bar" id="attachmentBar" style="display: none; margin-bottom: 6px;">
+          <span id="fileName" style="font-size: 12px; color: var(--primary-purple); font-weight: 600;">file.txt</span>
+          <button id="removeFileBtn" style="border:none; background:none; color:red; cursor:pointer; font-weight:bold; margin-left: 6px;">✕</button>
         </div>
 
         <div class="input-core-row">
           <input type="file" id="filePicker" accept="image/*,.txt,.js,.py,.html,.css,.json" hidden>
-          <button class="tool-btn" id="attachBtn" title="Upload">📎</button>
+          <button class="tool-btn" id="attachBtn" title="Upload Attachment">📎</button>
           <textarea id="userInput" placeholder="Type a message..." rows="1"></textarea>
-          <button class="mic-action-btn" id="micBtn" title="Speech">🎙️</button>
+          <button class="mic-action-btn" id="micBtn" title="Speech Input">🎙️</button>
           <button class="send-action-btn" id="sendBtn" disabled title="Send">➤</button>
         </div>
       </div>
     </section>
 
-    <!-- SCREEN 3: VOICE MODE (HOLOGRAPHIC ORB) -->
-    <section class="app-screen" id="voiceScreen">
-      <div class="screen-header">
-        <button class="back-circle-btn" id="voiceBackBtn">←</button>
-        <h3 class="greeting-name">Voice Chat</h3>
-        <button class="icon-circle-btn" id="voiceCloseScreenBtn">✕</button>
-      </div>
+    <!-- SCREEN 3: GEMINI LIVE CONTINUOUS VOICE + CAMERA -->
+    <section class="app-screen" id="liveScreen">
+      <!-- Fullscreen Background Video Stream -->
+      <video id="liveCamVideo" class="live-fullscreen-video" autoplay playsinline muted style="display: none;"></video>
+      <canvas id="liveCamCanvas" style="display: none;"></canvas>
 
-      <div class="voice-stage">
-        <div class="massive-iridescent-orb"></div>
-        <div class="voice-transcript-box">
-          <h3 id="voiceTranscriptText">Listening... Speak your thought daily.</h3>
+      <div class="live-screen-overlay">
+        <div class="screen-header">
+          <button class="back-circle-btn glass-dark" id="liveBackBtn">←</button>
+          <div class="live-status-pill">
+            <span class="live-pulse-dot"></span>
+            <span id="liveStatusText">Titan Live</span>
+          </div>
+          <button class="icon-circle-btn glass-dark" id="toggleCameraFeedBtn" title="Toggle Camera">📷</button>
         </div>
-      </div>
 
-      <div class="voice-footer-bar">
-        <button class="huge-mic-btn" id="voiceMainMicBtn">🎙️</button>
+        <div class="live-orb-center">
+          <div class="massive-iridescent-orb" id="liveOrbElement"></div>
+          <div class="live-transcript-card">
+            <h3 id="liveTranscriptText">"Listening to you... Talk naturally"</h3>
+          </div>
+        </div>
+
+        <div class="live-controls-dock">
+          <button class="dock-circle-btn" id="muteLiveMicBtn">🎙️</button>
+          <button class="dock-end-btn" id="endLiveSessionBtn">✕ End</button>
+        </div>
       </div>
     </section>
-
-    <!-- LIVE CAMERA MODAL -->
-    <div id="cameraModal" class="camera-modal-backdrop" style="display: none;">
-      <div class="camera-modal-content">
-        <div class="cam-header">
-          <span>Live Camera Scanner</span>
-          <button id="closeCamModalBtn">✕</button>
-        </div>
-        <video id="camVideo" autoplay playsinline muted></video>
-        <canvas id="camCanvas" style="display: none;"></canvas>
-        <div class="cam-footer">
-          <button class="capture-btn" id="snapPhotoBtn">📸 Capture & Analyze</button>
-        </div>
-      </div>
-    </div>
 
   </div>
 
