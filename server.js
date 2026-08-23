@@ -6,11 +6,12 @@ const { OpenAI } = require('openai');
 const app = express();
 const port = process.env.PORT || 3000;
 
-app.use(express.json({ limit: '30mb' }));
-app.use(express.urlencoded({ limit: '30mb', extended: true }));
+// High JSON body limit for large PDF/DOCX text & image base64 payloads
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(express.static(__dirname));
 
-// PWA routes
+// Direct PWA Routes
 app.get('/manifest.json', (req, res) => {
   res.setHeader('Content-Type', 'application/manifest+json');
   res.sendFile(path.join(__dirname, 'manifest.json'));
@@ -22,7 +23,7 @@ app.get('/sw.js', (req, res) => {
   res.sendFile(path.join(__dirname, 'sw.js'));
 });
 
-// Auto-detect Provider (Groq or OpenRouter)
+// Auto-Detect Provider
 const rawKey = process.env.OPENROUTER_API_KEY || process.env.API_KEY || process.env.GROQ_API_KEY || '';
 const apiKey = rawKey.trim();
 const isGroq = apiKey.startsWith('gsk_');
@@ -36,13 +37,12 @@ const openai = new OpenAI({
   }
 });
 
-// Default Static Fallbacks
+// Static Fallback Models
 const GROQ_MODELS = [
   'llama-3.3-70b-versatile',
   'llama-3.1-8b-instant'
 ];
 
-// High-probability active free models
 let dynamicOpenRouterFreeModels = [
   'google/gemini-2.0-flash-exp:free',
   'meta-llama/llama-3.3-70b-instruct:free',
@@ -51,14 +51,12 @@ let dynamicOpenRouterFreeModels = [
   'deepseek/deepseek-r1:free'
 ];
 
-// Dynamically fetch live free models from OpenRouter API
+// Dynamically Fetch Active Free Models to Guarantee Zero 404s
 async function refreshFreeModels() {
   if (isGroq || !apiKey || apiKey === 'dummy-key') return;
   try {
     const response = await fetch('https://openrouter.ai/api/v1/models', {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`
-      }
+      headers: { 'Authorization': `Bearer ${apiKey}` }
     });
     if (response.ok) {
       const data = await response.json();
@@ -66,19 +64,17 @@ async function refreshFreeModels() {
         const liveFree = data.data
           .map(m => m.id)
           .filter(id => id && id.endsWith(':free'));
-        
         if (liveFree.length > 0) {
           dynamicOpenRouterFreeModels = liveFree;
-          console.log(`[OpenRouter] Dynamically discovered ${liveFree.length} active free models:`, liveFree.slice(0, 4));
+          console.log(`[OpenRouter] Auto-discovered ${liveFree.length} active free models.`);
         }
       }
     }
   } catch (err) {
-    console.warn('[OpenRouter] Live model fetch failed, using fallback list:', err.message);
+    console.warn('[OpenRouter] Model discovery warning:', err.message);
   }
 }
 
-// Refresh models on server boot
 refreshFreeModels();
 
 app.post('/api/chat', async (req, res) => {
@@ -89,14 +85,14 @@ app.post('/api/chat', async (req, res) => {
   res.setHeader('Connection', 'keep-alive');
 
   if (!apiKey || apiKey === 'dummy-key') {
-    res.write(`data: ${JSON.stringify({ text: '⚠️ API Key is missing! Set OPENROUTER_API_KEY in Render Environment Variables.' })}\n\n`);
+    res.write(`data: ${JSON.stringify({ text: '⚠️ API Key is missing. Set OPENROUTER_API_KEY in Render Environment Variables.' })}\n\n`);
     res.write('data: [DONE]\n\n');
     return res.end();
   }
 
   const systemPrompt = {
     role: 'system',
-    content: 'You are Titan AI, an intelligent, human-like voice and vision assistant. Keep responses clear, fast, and properly formatted in markdown.'
+    content: 'You are Titan AI, an intelligent multimodal assistant. Analyze documents, PDFs, code, images, and user prompts thoroughly. Provide structured, accurate markdown responses.'
   };
 
   const payload = [systemPrompt, ...messages.filter(m => m.role !== 'system')];
@@ -124,36 +120,8 @@ app.post('/api/chat', async (req, res) => {
       res.write('data: [DONE]\n\n');
       return res.end();
     } catch (err) {
-      lastError = err.message || 'Model error';
-      console.warn(`[${isGroq ? 'Groq' : 'OpenRouter'}] Model ${model} failed (${lastError}), trying next candidate...`);
-    }
-  }
-
-  // If all cached models failed, force-refresh dynamic model list once and retry first 2
-  if (!streamSucceeded && !isGroq) {
-    console.log('[OpenRouter] Refreshing model cache after candidate exhaustion...');
-    await refreshFreeModels();
-    for (const model of dynamicOpenRouterFreeModels.slice(0, 2)) {
-      try {
-        const stream = await openai.chat.completions.create({
-          model: model,
-          messages: payload,
-          stream: true,
-        });
-
-        for await (const chunk of stream) {
-          const content = chunk.choices[0]?.delta?.content || '';
-          if (content) {
-            res.write(`data: ${JSON.stringify({ text: content })}\n\n`);
-          }
-        }
-
-        streamSucceeded = true;
-        res.write('data: [DONE]\n\n');
-        return res.end();
-      } catch (err) {
-        lastError = err.message;
-      }
+      lastError = err.message || 'Model failure';
+      console.warn(`[Titan AI] Model ${model} failed, switching to next fallback...`);
     }
   }
 
@@ -169,5 +137,5 @@ app.get('*', (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`Titan AI running on port ${port} | Engine: ${isGroq ? 'Groq' : 'OpenRouter Dynamic Free Engine'}`);
+  console.log(`Titan AI Server active on port ${port}`);
 });

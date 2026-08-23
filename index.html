@@ -16,19 +16,22 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
+  <!-- Document Parsers & Markdown Renderer -->
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body class="notranslate">
 
   <div class="mobile-container">
     
-    <!-- SCREEN 0: MANDATORY GOOGLE LOGIN GATE -->
+    <!-- SCREEN 0: GOOGLE LOGIN GATE -->
     <section class="app-screen active" id="authScreen">
       <div class="auth-card-wrapper">
-        <div class="massive-iridescent-orb" style="width: 140px; height: 140px;"></div>
+        <div class="massive-iridescent-orb" style="width: 130px; height: 130px;"></div>
         <h2 class="auth-title">Titan AI</h2>
-        <p class="auth-subtitle">Next-Generation Real-Time Voice & Vision Intelligence.</p>
+        <p class="auth-subtitle">Real-Time Voice, Vision & Document Intelligence.</p>
         
         <div class="google-auth-box">
           <div id="googleLandingBtn"></div>
@@ -54,8 +57,8 @@
 
       <!-- Center 3D Iridescent Orb -->
       <div class="hero-orb-wrapper">
-        <div class="iridescent-orb-sm" id="homeOrbTrigger" title="Tap to start live voice"></div>
-        <p class="hero-subtext">Tap orb for live voice and camera conversation.</p>
+        <div class="iridescent-orb-sm" id="homeOrbTrigger" title="Tap for Gemini Live"></div>
+        <p class="hero-subtext">Tap the orb for live voice and camera conversation.</p>
       </div>
 
       <!-- 2x2 Glass Bento Cards -->
@@ -67,23 +70,23 @@
 
         <div class="glass-bento-card" id="cardChatAI">
           <div class="bento-icon-title">💬 Smart Chat</div>
-          <p>Llama 3.3 high-speed intelligent chat.</p>
+          <p>Analyze PDF, DOCX, Code & Instant Chat.</p>
         </div>
 
         <div class="glass-bento-card" id="cardLiveVision">
           <div class="bento-icon-title">📷 Live Vision</div>
-          <p>Real-time environment visual search.</p>
+          <p>Real-time visual capture & document scan.</p>
         </div>
 
         <div class="glass-bento-card" id="cardDeepReason">
-          <div class="bento-icon-title">⚡ Reasoning</div>
-          <p>Step-by-step logic, code, and analysis.</p>
+          <div class="bento-icon-title">⚡ Deep Reasoning</div>
+          <p>Step-by-step logic, code, and document summary.</p>
         </div>
       </div>
 
-      <!-- Bottom Capsule Search -->
+      <!-- Search Capsule -->
       <div class="bottom-search-capsule" id="homeSearchTrigger">
-        <input type="text" placeholder="Ask anything..." readonly>
+        <input type="text" placeholder="Ask anything or analyze files..." readonly>
         <button class="sparkle-send-btn">✦</button>
       </div>
     </section>
@@ -101,18 +104,25 @@
       <div class="chat-bottom-deck">
         <div class="action-pill-carousel">
           <button class="deck-pill" id="deckLiveBtn">✨ Gemini Live</button>
+          <button class="deck-pill" id="deckUploadDocBtn">📄 Upload PDF / DOCX</button>
           <button class="deck-pill" id="deckReasonBtn">💡 Deep Reasoning</button>
         </div>
 
-        <div class="attachment-bar" id="attachmentBar" style="display: none; margin-bottom: 6px;">
-          <span id="fileName" style="font-size: 12px; color: var(--primary-purple); font-weight: 600;">file.txt</span>
-          <button id="removeFileBtn" style="border:none; background:none; color:red; cursor:pointer; font-weight:bold; margin-left: 6px;">✕</button>
+        <!-- Attachment Status Pill Bar -->
+        <div class="attachment-bar" id="attachmentBar" style="display: none;">
+          <div class="attachment-badge">
+            <span id="fileIcon">📄</span>
+            <span id="fileName">document.pdf</span>
+            <span id="fileStatusBadge" class="file-status">Ready</span>
+            <button id="removeFileBtn" class="remove-btn">✕</button>
+          </div>
         </div>
 
         <div class="input-core-row">
-          <input type="file" id="filePicker" accept="image/*,.txt,.js,.py,.html,.css,.json" hidden>
-          <button class="tool-btn" id="attachBtn" title="Upload Attachment">📎</button>
-          <textarea id="userInput" placeholder="Type a message..." rows="1"></textarea>
+          <!-- File picker configured for PDF, DOC, DOCX, TXT, Code, & Images -->
+          <input type="file" id="filePicker" accept=".pdf,.doc,.docx,.txt,.js,.py,.html,.css,.json,.csv,image/*" hidden>
+          <button class="tool-btn" id="attachBtn" title="Upload PDF, DOCX, Images">📎</button>
+          <textarea id="userInput" placeholder="Type a message or ask about your document..." rows="1"></textarea>
           <button class="mic-action-btn" id="micBtn" title="Speech Input">🎙️</button>
           <button class="send-action-btn" id="sendBtn" disabled title="Send">➤</button>
         </div>
@@ -121,30 +131,43 @@
 
     <!-- SCREEN 3: GEMINI LIVE CONTINUOUS VOICE + CAMERA -->
     <section class="app-screen" id="liveScreen">
-      <!-- Fullscreen Background Video Stream -->
       <video id="liveCamVideo" class="live-fullscreen-video" autoplay playsinline muted style="display: none;"></video>
       <canvas id="liveCamCanvas" style="display: none;"></canvas>
 
       <div class="live-screen-overlay">
+        <!-- Top Status Bar -->
         <div class="screen-header">
           <button class="back-circle-btn glass-dark" id="liveBackBtn">←</button>
           <div class="live-status-pill">
-            <span class="live-pulse-dot"></span>
-            <span id="liveStatusText">Titan Live</span>
+            <span class="live-pulse-dot" id="livePulseDot"></span>
+            <span id="liveStatusText">Live Listening</span>
           </div>
-          <button class="icon-circle-btn glass-dark" id="toggleCameraFeedBtn" title="Toggle Camera">📷</button>
+          <button class="icon-circle-btn glass-dark" id="liveToggleCamBtn" title="Toggle Camera">📷</button>
         </div>
 
+        <!-- Center Stage -->
         <div class="live-orb-center">
           <div class="massive-iridescent-orb" id="liveOrbElement"></div>
           <div class="live-transcript-card">
-            <h3 id="liveTranscriptText">"Listening to you... Talk naturally"</h3>
+            <h3 id="liveTranscriptText">"Listening to you... Speak anytime."</h3>
           </div>
         </div>
 
+        <!-- Interactive Control Dock -->
         <div class="live-controls-dock">
-          <button class="dock-circle-btn" id="muteLiveMicBtn">🎙️</button>
-          <button class="dock-end-btn" id="endLiveSessionBtn">✕ End</button>
+          <button class="dock-circle-btn" id="liveMuteBtn" title="Mute/Unmute Mic">
+            <span id="muteIcon">🎙️</span>
+          </button>
+
+          <button class="dock-circle-btn" id="livePauseBtn" title="Pause / Resume Live">
+            <span id="pauseIcon">⏸️</span>
+          </button>
+
+          <button class="dock-circle-btn interrupt-glow-btn" id="liveInterruptBtn" title="Interrupt AI Speaking">
+            ⚡ Stop AI
+          </button>
+
+          <button class="dock-end-btn" id="liveEndBtn">✕ End</button>
         </div>
       </div>
     </section>

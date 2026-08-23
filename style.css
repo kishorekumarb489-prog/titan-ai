@@ -1,6 +1,6 @@
 :root {
   --bg-gradient: linear-gradient(135deg, #f3f0ff 0%, #e0e7ff 50%, #fae8ff 100%);
-  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-bg: rgba(255, 255, 255, 0.75);
   --glass-border: rgba(255, 255, 255, 0.9);
   --text-main: #1e1b4b;
   --text-muted: #64748b;
@@ -73,7 +73,7 @@ body {
   z-index: 10;
 }
 
-/* AUTH GATE SCREEN */
+/* SCREEN 0: AUTH GATE */
 #authScreen {
   justify-content: center;
   align-items: center;
@@ -120,7 +120,7 @@ body {
   text-decoration: underline;
 }
 
-/* SCREEN HEADERS */
+/* HEADERS */
 .screen-header {
   display: flex;
   align-items: center;
@@ -177,7 +177,7 @@ body {
   font-weight: bold;
 }
 
-/* 3D IRIDESCENT ORB */
+/* 3D ORB CENTERPIECE */
 .hero-orb-wrapper {
   display: flex;
   flex-direction: column;
@@ -221,7 +221,7 @@ body {
   margin-top: 8px;
 }
 
-/* GLASS BENTO CARDS */
+/* 2x2 GLASS BENTO */
 .glass-bento-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -258,7 +258,7 @@ body {
   line-height: 1.3;
 }
 
-/* SEARCH CAPSULE */
+/* CAPSULE SEARCH */
 .bottom-search-capsule {
   background: var(--glass-bg);
   backdrop-filter: blur(14px);
@@ -326,6 +326,46 @@ body {
   max-width: 88%;
   font-size: 14px;
   line-height: 1.5;
+}
+
+/* ATTACHMENT BADGE UI */
+.attachment-bar {
+  margin-bottom: 8px;
+}
+
+.attachment-badge {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(124, 58, 237, 0.3);
+  padding: 6px 12px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary-purple);
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.1);
+}
+
+.file-status {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 8px;
+  text-transform: uppercase;
+}
+
+.file-status.parsing { background: #fef08a; color: #854d0e; }
+.file-status.ready { background: #bbf7d0; color: #166534; }
+.file-status.error { background: #fecaca; color: #991b1b; }
+
+.remove-btn {
+  background: none;
+  border: none;
+  color: #ef4444;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  margin-left: 4px;
 }
 
 /* CHAT BOTTOM DECK */
@@ -469,32 +509,65 @@ body {
   color: #fff;
 }
 
+/* LIVE DOCK CONTROLS */
 .live-controls-dock {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 20px;
-  padding-bottom: 12px;
+  gap: 12px;
+  padding-bottom: 16px;
+  flex-wrap: wrap;
 }
 
 .dock-circle-btn {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.25);
-  backdrop-filter: blur(10px);
+  min-width: 48px;
+  height: 48px;
+  padding: 0 14px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.22);
+  backdrop-filter: blur(14px);
   border: 1px solid rgba(255, 255, 255, 0.4);
   color: #fff;
-  font-size: 22px;
+  font-size: 15px;
+  font-weight: 700;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.dock-circle-btn:active {
+  transform: scale(0.92);
+}
+
+.dock-circle-btn.btn-active-state {
+  background: rgba(239, 68, 68, 0.35);
+  border-color: #ef4444;
+  color: #fca5a5;
+}
+
+.dock-circle-btn.btn-pause-state {
+  background: rgba(234, 179, 8, 0.35);
+  border-color: #eab308;
+  color: #fef08a;
+}
+
+.interrupt-glow-btn {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.6), rgba(236, 72, 153, 0.6));
+  border-color: rgba(255, 255, 255, 0.5);
 }
 
 .dock-end-btn {
   background: #ef4444;
   color: #fff;
   border: none;
-  padding: 12px 26px;
-  border-radius: 28px;
+  height: 48px;
+  padding: 0 20px;
+  border-radius: 24px;
   font-weight: 700;
+  font-size: 14px;
   cursor: pointer;
+  box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
 }
